@@ -1,0 +1,7 @@
+{{define "body"}}<form class="login" method="post" action="/login">
+<h1>Boxvector</h1>
+{{with .Data}}<p class="err">{{.}}</p>{{end}}
+<label>User<input name="user" autocomplete="username" required autofocus></label>
+<label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+<button class="pri">Sign in</button>
+</form>{{end}}

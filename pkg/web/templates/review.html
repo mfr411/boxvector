@@ -1,0 +1,13 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>{{.What}}</h2></div>
+{{if not .Diff}}<p class="s">No changes compared to the running config.</p><a class="btn" href="/config">Back</a>
+{{else}}
+<pre class="diff">{{range .Diff}}<span class="d{{op .Op}}">{{op .Op}} {{.Text}}</span>
+{{end}}</pre>
+<h3>Dry run {{if .OK}}<span class="st">passed</span>{{else}}<span class="st d">failed</span>{{end}}</h3>
+<pre class="out">{{if .Out}}{{.Out}}{{else}}(no output){{end}}</pre>
+<form method="post" action="/config/apply" class="act"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<input type="hidden" name="what" value="{{.What}}"><textarea name="text" hidden>{{.Cand}}</textarea>
+<a class="btn" href="/config">Cancel</a>{{if .OK}}<button class="pri" data-confirm="Apply to BIRD now?">Apply</button>{{end}}
+</form>{{end}}
+{{end}}{{end}}

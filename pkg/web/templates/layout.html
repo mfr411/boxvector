@@ -1,0 +1,10 @@
+{{define "layout"}}<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><title>{{.Title}} · Boxvector</title>
+<link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
+<body>{{if .User}}<header><b>Boxvector</b>
+<nav><a href="/"{{if eq .Nav "peers"}} class="on"{{end}}>Peers</a><a href="/config"{{if eq .Nav "config"}} class="on"{{end}}>Config</a><a href="/routes"{{if eq .Nav "routes"}} class="on"{{end}}>Routes</a><a href="/logs"{{if eq .Nav "logs"}} class="on"{{end}}>Logs</a></nav>
+<details class="acct"><summary>{{.Router.Hostname}}{{if .Router.ASN}} · AS{{.Router.ASN}}{{end}} · {{.Version}}</summary>
+<div class="menu"><span>Signed in as {{.User}}</span><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button>Sign out</button></form></div></details>
+</header>{{end}}
+<main>{{template "body" .}}</main></body></html>{{end}}

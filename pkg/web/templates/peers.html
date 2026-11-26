@@ -1,0 +1,10 @@
+{{define "body"}}{{with .Data}}
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<div class="sum"><div><b>{{.Sum.Up}}</b>Sessions up</div><div><b>{{.Sum.Down}}</b>Not established</div><div><b>{{num .Sum.R4}}</b>Routes v4</div><div><b>{{num .Sum.R6}}</b>Routes v6</div><div><b>{{if .Sum.Last}}{{.Sum.Last}}{{else}}—{{end}}</b>Last apply</div></div>
+<div class="bar"><h2>Peers</h2><input id="filter" type="search" placeholder="Filter" aria-label="Filter peers"><a class="btn" href="/peers/new">Add peer</a></div>
+<table id="peers"><thead><tr><th>Peer</th><th class="hm">Neighbor</th><th>State</th><th class="n">Imported</th><th class="n hm">Exported</th><th class="hm">Since</th></tr></thead><tbody>
+{{range .Rows}}<tr><td>{{.Name}}<div class="s">AS{{.ASN}}<span class="hm"> · {{.Proto}}</span></div></td><td class="hm mono">{{.Neighbor}}</td>
+<td><span class="st {{.Class}}">{{if .Info}}{{.Info}}{{else}}{{.State}}{{end}}</span></td><td class="n">{{num .Imported}}</td><td class="n hm">{{num .Exported}}</td><td class="hm s">{{.Since}}</td></tr>
+{{else}}<tr><td colspan="6" class="s">No BGP sessions.</td></tr>{{end}}
+</tbody></table>
+{{end}}{{end}}

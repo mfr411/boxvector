@@ -1,0 +1,5 @@
+{{define "body"}}{{with .Data}}
+<form class="bar" method="get" action="/routes"><h2>Routes</h2><input name="q" value="{{.Q}}" placeholder="IP, prefix or AS" aria-label="Query"><button>Search</button></form>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+{{if .Cmd}}<p class="s mono">{{.Cmd}}</p><pre class="out">{{.Out}}</pre>{{end}}
+{{end}}{{end}}

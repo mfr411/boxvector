@@ -1,0 +1,16 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>Add peer</h2></div>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<form class="frm" method="post" action="/peers/new"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<label>Name<input name="name" value="{{index .F "name"}}" required maxlength="64" placeholder="Example Networks"></label>
+<label>ASN<input name="asn" value="{{index .F "asn"}}" required inputmode="numeric" placeholder="65510"></label>
+<label class="w">Neighbors<textarea name="neighbors" rows="2" required placeholder="203.0.113.1, 2001:db8::1">{{index .F "neighbors"}}</textarea></label>
+<label class="w">Description<input name="description" value="{{index .F "description"}}" maxlength="120"></label>
+<label>Template<input name="template" value="{{index .F "template"}}" placeholder="optional"></label>
+<label>AS-SET<input name="asset" value="{{index .F "asset"}}" placeholder="optional, e.g. AS-EXAMPLE"></label>
+<label>Import limit v4<input name="limit4" value="{{index .F "limit4"}}" inputmode="numeric" placeholder="auto"></label>
+<label>Import limit v6<input name="limit6" value="{{index .F "limit6"}}" inputmode="numeric" placeholder="auto"></label>
+<div class="w act"><a class="btn" href="/">Cancel</a><button class="pri">Review</button></div>
+</form>
+<p class="s">Nothing is applied yet. The next page shows the diff and a dry-run before you apply.</p>
+{{end}}{{end}}
