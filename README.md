@@ -17,8 +17,10 @@ BIRD 3, security hardening and a web interface.
 
 | OS | Minimum version | BIRD from apt |
 |----|-----------------|---------------|
-| Debian | **12 (bookworm)** | 13: `bird3` · 12: `bird2` (BIRD 3 via CZ.NIC repo) |
-| Ubuntu | **22.04 (jammy)** | `bird2` (BIRD 3 via CZ.NIC repo) |
+| Debian | **12 (bookworm)** | `bird2` on 12 and 13 · `bird3` on 13 (12: CZ.NIC repo) |
+| Ubuntu | **22.04 (jammy)** | `bird2` · `bird3` via CZ.NIC repo |
+
+BIRD 2 (2.0.7+) and BIRD 3 are both supported; see [BIRD 2 or BIRD 3](#4-bird-2-or-bird-3).
 
 Architectures: amd64, arm64. Derivatives (Proxmox VE, Linux Mint, …) work if
 their base is one of the above.
@@ -32,15 +34,37 @@ distributions are **not supported**; the package refuses to install there.
 
 ### 1.1 BIRD
 
-Debian 13 ships BIRD 3:
+Boxvector works with **BIRD 2 (2.0.7 or newer) and BIRD 3**. BIRD 3 is not
+required. The installed version is detected on every run (`bird --version`)
+and the config is generated for it. BIRD 3-only options such as
+`bird-threads` are skipped on BIRD 2 with a warning.
+
+Pick one:
+
+**Option A: BIRD 2 (from the OS repository)**
+
+Available on every supported release. This is the simplest choice and fine
+for most routers.
+
+```sh
+sudo apt update
+sudo apt install bird2 bgpq4
+bird --version          # BIRD version 2.x
+```
+
+Versions shipped: Debian 12 → 2.0.12, Debian 13 → 2.17.6, Ubuntu 22.04 → 2.0.8,
+Ubuntu 24.04 → 2.14.
+
+**Option B: BIRD 3**
+
+Debian 13 ships it:
 
 ```sh
 sudo apt update
 sudo apt install bird3 bgpq4
 ```
 
-Debian 12 and Ubuntu ship BIRD 2 (`sudo apt install bird2 bgpq4` works
-fine). For BIRD 3 there use the CZ.NIC repository:
+On Debian 12 and Ubuntu use the CZ.NIC repository:
 
 ```sh
 sudo apt install apt-transport-https ca-certificates wget lsb-release
@@ -207,7 +231,55 @@ previous config is restored automatically and BIRD is left untouched.
 
 ---
 
-## 4. Upgrade and remove
+## 4. BIRD 2 or BIRD 3
+
+Both use the same `boxvector.yml`; nothing in your config has to change.
+
+| | BIRD 2 | BIRD 3 |
+|---|---|---|
+| Supported | 2.0.7 and newer | 3.0 and newer |
+| Tested in CI | 2.0.12, 2.20.0 | 3.1.9, 3.4.0 |
+| `bird-threads` | ignored (warning) | `threads N;` written |
+| Package name | `bird2` | `bird3` |
+
+Check which one Boxvector sees (the first log lines of every run):
+
+```sh
+sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml --dry-run 2>&1 | grep 'BIRD version'
+# level=info msg="BIRD version 2.0.12"
+```
+
+### Moving from BIRD 2 to BIRD 3
+
+Do this in a maintenance window: BGP sessions restart when BIRD restarts.
+
+```sh
+# 1. back up the current config
+sudo tar czf /root/bird2-backup-$(date +%F).tgz /etc/bird /etc/boxvector
+
+# 2. add the BIRD 3 repository (Debian 12 / Ubuntu only, see 1.1 Option B)
+
+# 3. replace the package (bird3 conflicts with bird2, apt swaps them)
+sudo apt install bird3
+
+# 4. the bird3 package resets /etc/bird ownership; restore Boxvector's access
+sudo dpkg-reconfigure boxvector
+
+# 5. regenerate for BIRD 3 and check the sessions
+sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml
+sudo systemctl restart bird
+sudo birdc show protocols
+```
+
+Optional: add `bird-threads: 4` (about one per CPU core) to `boxvector.yml`
+to use BIRD 3's multi-threading, then run `generate` again.
+
+Back to BIRD 2: `sudo apt install bird2 && sudo dpkg-reconfigure boxvector`,
+run `generate` again and restart `bird`. Or restore the backup from step 1.
+
+---
+
+## 5. Upgrade and remove
 
 ```sh
 sudo apt install ./boxvector_<new-version>_amd64.deb   # config kept, service restarted
@@ -219,7 +291,7 @@ Generated BIRD files in `/etc/bird` are never removed by the package.
 
 ---
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 - **`unsupported OS` during install** – Debian 12 / Ubuntu 22.04 or newer is
   required. Upgrade the OS first.
@@ -230,6 +302,10 @@ Generated BIRD files in `/etc/bird` are never removed by the package.
   `sudo chgrp bird /etc/bird && sudo chmod 2775 /etc/bird`
 - **Web UI does not start** – `journalctl -u boxvector-web -e`; usually a
   missing `web.users` or wrong permissions on it.
+- **`BIRD version ... older than minimum supported version 2.0.7`** – install
+  `bird2` from your OS repository (all supported releases ship a newer one).
+- **`bird-threads is set but BIRD 2.x does not support threads, ignoring`** –
+  harmless on BIRD 2; remove the option or move to BIRD 3 (section 4).
 - **Validation error on apply** – the page shows BIRD's error with file and
   line. Nothing was applied.
 
