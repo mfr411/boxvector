@@ -71,3 +71,6 @@ aside h3{margin-top:6px}
  aside{width:auto}
  .frm{grid-template-columns:1fr}
 }
+
+footer{padding:18px 24px;color:var(--mu);font-size:12px;text-align:center}
+footer a{color:var(--mu)}

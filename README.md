@@ -375,6 +375,22 @@ Pushing a tag `v*` builds both packages in CI and attaches them to a GitHub
 release. CI also checks every config in `tests/` against BIRD 2.0.12, 2.20.0,
 3.1.9 and 3.4.0.
 
+## Credits
+
+Boxvector is built on top of open-source work by others:
+
+- **[Pathvector](https://github.com/natesales/pathvector)** by
+  [Nate Sales](https://github.com/natesales) and contributors – the original
+  project this fork is based on (config model, templates, IRR/RPKI/PeeringDB
+  filtering, optimizer). Thank you.
+- **[BIRD Internet Routing Daemon](https://bird.nic.cz)** by CZ.NIC Labs.
+- **[bgpq4](https://github.com/bgp/bgpq4)** for IRR prefix lists,
+  **[PeeringDB](https://www.peeringdb.com)** for network data.
+
+Boxvector is maintained by [PT Atharva Telematika Persada](https://atharva.co.id)
+(Muhammad Fhandika Rafif).
+
 ## License
 
-MIT, see [LICENSE](LICENSE). Based on Pathvector by Nate Sales.
+MIT, see [LICENSE](LICENSE). The original Pathvector copyright notice is kept
+as required by the license.

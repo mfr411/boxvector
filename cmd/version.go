@@ -20,6 +20,7 @@ func init() {
 func versionBanner() string {
 	buf := fmt.Sprintf(`Boxvector %s
 Built %s on %s
+Based on Pathvector by Nate Sales (https://github.com/natesales/pathvector)
 `, version, commit, date)
 	if len(plugin.Get()) > 0 {
 		buf += "Plugins:\n"
