@@ -17,7 +17,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/mod/semver"
 
-	"github.com/natesales/pathvector/pkg/util"
+	"github.com/mfr411/boxvector/pkg/util"
 )
 
 // Minimum supported BIRD version
@@ -135,6 +135,9 @@ func RunCommand(command string, socket string) (string, string, error) {
 	return resp, birdVersion, nil // nil error
 }
 
+// reValidationError matches "<file>:<line>:<col> <message>" in BIRD 2 and BIRD 3 output
+var reValidationError = regexp.MustCompile(`(?m)(\S+\.conf):(\d+):(\d+)\s+(.*)$`)
+
 // Validate checks if the cached configuration is syntactically valid
 func Validate(binary string, cacheDir string) {
 	log.Debugf("Validating BIRD config")
@@ -148,27 +151,15 @@ func Validate(binary string, cacheDir string) {
 		origErr := err
 		errbT = strings.TrimSuffix(errb.String(), "\n")
 
-		// Check for validation error in format:
-		// bird: ./AS65530_EXAMPLE.conf:20:43 syntax error, unexpected '%'
-		match, err := regexp.MatchString(`bird:.*:\d+:\d+.*`, errbT)
-		if err != nil {
-			log.Fatalf("BIRD error regex match: %s", err)
-		}
+		// Check for validation error. BIRD 2 and BIRD 3 differ:
+		//   BIRD 2: bird: ./AS65530_EXAMPLE.conf:20:43 syntax error, unexpected '%'
+		//   BIRD 3: bird: 2026-01-01 00:00:00.000 [0000] <FATAL> ./AS65530_EXAMPLE.conf:20:43 syntax error, ...
 		errorMessageToLog := errbT
-		if match {
+		if m := reValidationError.FindStringSubmatch(errbT); m != nil {
 			errorMessageToLog = "BIRD validation error:\n" // Clear error message so we can write the new nicely formatted one
-			respPartsSpace := strings.Split(errbT, " ")
-			respPartsColon := strings.Split(respPartsSpace[1], ":")
-			errorMessage := strings.Join(respPartsSpace[2:], " ")
-			errorFile := respPartsColon[0]
-			errorLine, err := strconv.Atoi(respPartsColon[1])
-			if err != nil {
-				log.Fatalf("BIRD error line int parse: %s", err)
-			}
-			errorChar, err := strconv.Atoi(respPartsColon[2])
-			if err != nil {
-				log.Fatalf("BIRD error line int parse: %s", err)
-			}
+			errorFile, errorMessage := m[1], m[4]
+			errorLine, _ := strconv.Atoi(m[2]) // regex guarantees digits
+			errorChar, _ := strconv.Atoi(m[3])
 			log.Debugf("Found error in %s:%d:%d message %s", errorFile, errorLine, errorChar, errorMessage)
 
 			// Read output file

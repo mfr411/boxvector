@@ -12,7 +12,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/natesales/pathvector/pkg/config"
+	"github.com/mfr411/boxvector/pkg/config"
 )
 
 // Endpoint is a public value to allow setting to a cache server

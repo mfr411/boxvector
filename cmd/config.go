@@ -13,8 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
-	"github.com/natesales/pathvector/pkg/bird"
-	"github.com/natesales/pathvector/pkg/process"
+	"github.com/mfr411/boxvector/pkg/bird"
+	"github.com/mfr411/boxvector/pkg/process"
 )
 
 var sensitiveKeys = []string{

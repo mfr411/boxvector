@@ -35,6 +35,11 @@ func Sanitize(input string) *string {
 		}
 	}
 
+	// Guard: a name without any usable character must not panic (index out of range)
+	if output == "" {
+		output = "PEER"
+	}
+
 	// Add peer prefix if the first character of peerName is a number
 	if unicode.IsDigit(rune(output[0])) {
 		output = "PEER_" + output

@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/natesales/pathvector/pkg/config"
-	"github.com/natesales/pathvector/pkg/util"
+	"github.com/mfr411/boxvector/pkg/config"
+	"github.com/mfr411/boxvector/pkg/util"
 )
 
 const peeringDbQueryTimeout = 10 // 10 seconds

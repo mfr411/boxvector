@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/natesales/pathvector/pkg/config"
+	"github.com/mfr411/boxvector/pkg/config"
 )
 
 // withSourceFilter returns the AS set or AS set with the IRR source replaced with the -S SOURCE syntax
@@ -25,11 +26,34 @@ func withSourceFilter(asSet string) string {
 	return asSet
 }
 
+var (
+	// AS-SET / AS number, optionally with an IRR source prefix (RIPE::AS-FOO)
+	reASSet = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:_.\-]{0,127}$`)
+	// IRR server hostname, optional port
+	reIRRHost = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9.\-]{0,252}(:[0-9]{1,5})?$`)
+	// one prefix line from bgpq4 BIRD output, e.g. 192.0.2.0/24{24,24}
+	rePrefixLine = regexp.MustCompile(`^[0-9A-Fa-f:.]+/[0-9]{1,3}(\{[0-9]{1,3},[0-9]{1,3}\}|[+-])?$`)
+)
+
+// checkQuery refuses AS sets and servers that could smuggle extra bgpq4 flags.
+func checkQuery(asSet, irrServer string) error {
+	if !reASSet.MatchString(asSet) || strings.HasPrefix(asSet, "-") {
+		return fmt.Errorf("invalid AS set %q", asSet)
+	}
+	if !reIRRHost.MatchString(irrServer) {
+		return fmt.Errorf("invalid IRR server %q", irrServer)
+	}
+	return nil
+}
+
 // PrefixSet uses bgpq4 to generate a prefix filter and return only the filter lines
 func PrefixSet(macro string, family uint8, irrServer string, queryTimeout uint, bgpqArgs string) ([]string, error) {
 	var prefixes []string
 
-	for _, asSet := range strings.Split(macro, " ") {
+	for _, asSet := range strings.Fields(macro) {
+		if err := checkQuery(asSet, irrServer); err != nil {
+			return nil, err
+		}
 		// Run bgpq4 for BIRD format with aggregation enabled
 		cmdArgs := fmt.Sprintf("-h %s -Ab%d %s", irrServer, family, withSourceFilter(asSet))
 		if bgpqArgs != "" {
@@ -53,7 +77,14 @@ func PrefixSet(macro string, family uint8, irrServer string, queryTimeout uint, 
 				break
 			}
 			// Trim whitespace and remove the comma, then append to the prefixes slice
-			prefixes = append(prefixes, strings.TrimSpace(strings.TrimRight(line, ",")))
+			p := strings.TrimSpace(strings.TrimRight(strings.TrimSpace(line), ","))
+			if p == "" {
+				continue
+			}
+			if !rePrefixLine.MatchString(p) {
+				return nil, fmt.Errorf("unexpected bgpq4 output line %q", p)
+			}
+			prefixes = append(prefixes, p)
 		}
 	}
 
@@ -62,6 +93,9 @@ func PrefixSet(macro string, family uint8, irrServer string, queryTimeout uint, 
 
 // ASMembers uses bgpq4 to generate an AS member set
 func ASMembers(asSet string, irrServer string, queryTimeout uint, bgpqArgs string) ([]uint32, error) {
+	if err := checkQuery(asSet, irrServer); err != nil {
+		return nil, err
+	}
 	// Run bgpq4 for BIRD format with aggregation enabled
 	cmdArgs := fmt.Sprintf("-h %s -tj %s", irrServer, withSourceFilter(asSet))
 	if bgpqArgs != "" {

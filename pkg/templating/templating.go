@@ -3,6 +3,7 @@ package templating
 import (
 	"embed"
 	"fmt"
+	htmltemplate "html/template"
 	"os"
 	"strconv"
 	"strings"
@@ -12,8 +13,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/natesales/pathvector/pkg/config"
-	"github.com/natesales/pathvector/pkg/util"
+	"github.com/mfr411/boxvector/pkg/config"
+	"github.com/mfr411/boxvector/pkg/util"
 )
 
 var (
@@ -39,8 +40,31 @@ func ProtocolNames() map[string]*Protocol {
 	return protocolNameMap
 }
 
+// BirdQuote makes a value safe between "..." in a BIRD config. BIRD string
+// literals have no escape sequences (verified on 2.20 and 3.4), so a double
+// quote becomes a single quote and control characters are dropped.
+func BirdQuote(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		switch {
+		case r == '"':
+			b.WriteRune('\'')
+		case r < 0x20 || r == 0x7f:
+			// control characters (newline, tab, ...) are never valid here
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // Template functions
 var funcMap = template.FuncMap{
+	// Q escapes a value for use inside a double-quoted BIRD string so that
+	// config input can never close the string and inject statements.
+	"Q": BirdQuote,
+	// C makes a value safe for a single-line "# ..." comment.
+	"C":        func(s string) string { return strings.NewReplacer("\n", " ", "\r", " ").Replace(s) },
 	"Contains": strings.Contains,
 
 	"Iterate": func(count *int) []int {
@@ -258,10 +282,17 @@ var funcMap = template.FuncMap{
 
 var Template *template.Template
 
+// uiTemplate is rendered with html/template so peer data is HTML-escaped (no XSS)
+var uiTemplate *htmltemplate.Template
+
 // Load loads the templates from the embedded filesystem
 func Load(fs embed.FS) error {
 	var err error
 	Template, err = template.New("").Funcs(funcMap).ParseFS(fs, "templates/*.tmpl")
+	if err != nil {
+		return err
+	}
+	uiTemplate, err = htmltemplate.New("").Funcs(htmltemplate.FuncMap(funcMap)).ParseFS(fs, "templates/ui.tmpl")
 	return err
 }
 
@@ -296,7 +327,7 @@ func WriteUIFile(config *config.Config) {
 
 	// Render the UI template and write to disk
 	log.Debug("Writing UI file")
-	if err := Template.ExecuteTemplate(uiFileObj, "ui.tmpl", config); err != nil {
+	if err := uiTemplate.ExecuteTemplate(uiFileObj, "ui.tmpl", config); err != nil {
 		log.Fatalf("Execute UI template: %v", err)
 	}
 	log.Debug("Finished writing UI file")

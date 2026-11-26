@@ -56,7 +56,7 @@ timeformat log iso long;
 timeformat protocol iso long;
 timeformat route iso long;
 
-log {{ if eq .LogFile "syslog" }}syslog{{ else }}"{{ .LogFile }}"{{ end }} all;
+log {{ if eq .LogFile "syslog" }}syslog{{ else }}"{{ Q .LogFile }}"{{ end }} all;
 
 protocol device {};
 
@@ -72,10 +72,10 @@ protocol kernel {
       {{ if .Kernel.RejectConnected }}if source = RTS_DEVICE then reject;{{ end }}
       {{ $length := len .Kernel.SRDCommunities }}{{ if eq $length 0 }}
       {{- range $i, $rule := .Kernel.Accept4 }}
-      if (proto = "{{ $rule }}") then accept;
+      if (proto = "{{ Q $rule }}") then accept;
       {{- end }}
       {{- range $i, $rule := .Kernel.Reject4 }}
-      if (proto = "{{ $rule }}") then reject;
+      if (proto = "{{ Q $rule }}") then reject;
       {{- end }}
       {{ if .Source4 -}}
       if source = RTS_STATIC {{ if .Prefixes4 -}}&& proto != "static4"{{ end }} then {
@@ -114,10 +114,10 @@ protocol kernel {
       {{ if .Kernel.RejectConnected }}if source = RTS_DEVICE then reject;{{ end }}
       {{ $length := len .Kernel.SRDCommunities }}{{ if eq $length 0 }}
       {{- range $i, $rule := .Kernel.Accept6 }}
-      if (proto = "{{ $rule }}") then accept;
+      if (proto = "{{ Q $rule }}") then accept;
       {{- end }}
       {{- range $i, $rule := .Kernel.Reject6 }}
-      if (proto = "{{ $rule }}") then reject;
+      if (proto = "{{ Q $rule }}") then reject;
       {{- end }}
       {{ if .Source6 -}}
       if source = RTS_STATIC {{ if .Prefixes6 -}}&& proto != "static6"{{ end }} then {
@@ -187,7 +187,7 @@ protocol rpki {
   roa6 { table rpki6; };
 
   transport tcp;
-  remote "{{ .RTRServerHost }}" port {{ .RTRServerPort }};
+  remote "{{ Q .RTRServerHost }}" port {{ .RTRServerPort }};
 
   retry keep 90;
   refresh keep 900;
@@ -371,7 +371,7 @@ function accept_local() {
 {{ range $i, $instance := .BFDInstances }}
 protocol bfd {{ StrDeref $instance.ProtocolName }} {
   neighbor {{ StrDeref $instance.Neighbor }};
-  interface "{{ StrDeref $instance.Interface }}" {
+  interface "{{ Q (StrDeref $instance.Interface) }}" {
     interval {{ UintDeref $instance.Interval }} ms;
     multiplier {{ UintDeref $instance.Multiplier }};
   };
@@ -381,9 +381,9 @@ protocol bfd {{ StrDeref $instance.ProtocolName }} {
 # ---- MRT ----
 {{ range $i, $instance := .MRTInstances }}
 protocol mrt {{ StrDeref $instance.ProtocolName }} {
-  filename "{{ StrDeref $instance.File }}";
+  filename "{{ Q (StrDeref $instance.File) }}";
   period "{{ UintDeref $instance.Interval }}";
-  {{ if $instance.Table }}table "{{ StrDeref $instance.Table }}";{{ end }}
+  {{ if $instance.Table }}table "{{ Q (StrDeref $instance.Table) }}";{{ end }}
 }
 {{ end }}
 # ---- Custom global config ----

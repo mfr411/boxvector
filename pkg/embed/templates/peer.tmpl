@@ -1,6 +1,6 @@
 {{ $peer := .Peer }}{{ $peerName := .Name }}{{ $global := .Config }}
 
-# {{ .Name }} AS{{ $peer.ASN }}
+# {{ C .Name }} AS{{ $peer.ASN }}
 
 define AS{{ $peer.ASN }}_{{ $peer.ProtocolName }}_IMPORT_v4 = {{ $peer.ImportLimit4 }};
 define AS{{ $peer.ASN }}_{{ $peer.ProtocolName }}_IMPORT_v6 = {{ $peer.ImportLimit6 }};
@@ -38,12 +38,12 @@ define AS{{ $peer.ASN }}_{{ $peer.ProtocolName }}_AS_SET_MEMBERS = [
 protocol bgp {{ UniqueProtocolName $peer.ProtocolName $peerName $af $peer.ASN $peer.Tags }} {
     local{{ if eq $af "4" }}{{ if $peer.Listen4 }} {{ $peer.Listen4 }}{{ end }}{{ else }}{{ if $peer.Listen6 }} {{ $peer.Listen6 }}{{ end }}{{ end }} as {{ if IntDeref $peer.LocalASN }}{{ IntDeref $peer.LocalASN }}{{ else }}ASN{{ end }}{{ if $peer.LocalPort }} port {{ $peer.LocalPort }}{{ end }};
     neighbor {{ $neighbor }} as {{ $peer.ASN }}{{ if $peer.NeighborPort }} port {{ $peer.NeighborPort }}{{ end }};
-    {{ if StrDeref $peer.Description }}description "{{ StrDeref $peer.Description }}";{{ end }}
+    {{ if StrDeref $peer.Description }}description "{{ Q (StrDeref $peer.Description) }}";{{ end }}
     {{ if BoolDeref $peer.Disabled }}disabled;{{ end }}
     {{ if BoolDeref $peer.Passive }}passive;{{ end }}
     {{ if BoolDeref $peer.Direct }}direct;{{ end }}
     {{ if BoolDeref $peer.Multihop }}multihop 255;{{ end }}
-    {{ if StrDeref $peer.Password }}password "{{ StrDeref $peer.Password }}";{{ end }}
+    {{ if StrDeref $peer.Password }}password "{{ Q (StrDeref $peer.Password) }}";{{ end }}
     {{ if BoolDeref $peer.RSClient }}rs client;{{ end }}
     {{ if BoolDeref $peer.RRClient }}rr client;{{ end }}
     {{ if BoolDeref $peer.BFD }}bfd on;{{ end }}

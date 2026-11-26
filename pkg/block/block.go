@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -110,6 +111,21 @@ func fromReader(reader io.Reader) ([]string, error) {
 	return out, nil
 }
 
+var httpClient = &http.Client{Timeout: 30 * time.Second}
+
+// fetch downloads one blocklist with a timeout and a 16 MiB size cap.
+func fetch(url string) ([]string, error) {
+	resp, err := httpClient.Get(url) //nolint:gosec // URL comes from the operator's config
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+	return fromReader(io.LimitReader(resp.Body, 16<<20))
+}
+
 // Combine aggregates blocklist entries from a manual list, slice of URLs, and slice of files
 func Combine(manualBlocklist, blocklistURLs, blocklistFiles []string) []string {
 	var out []string
@@ -119,19 +135,11 @@ func Combine(manualBlocklist, blocklistURLs, blocklistFiles []string) []string {
 	// Fetch blocklist URLs
 	for _, url := range blocklistURLs {
 		// Fetch the blocklist
-		//nolint:gosec
-		resp, err := http.Get(url)
+		entries, err := fetch(url)
 		if err != nil {
 			log.Warnf("Error fetching blocklist from %s: %s", url, err)
 			continue
 		}
-
-		entries, err := fromReader(resp.Body)
-		if err != nil {
-			log.Warnf("Error reading blocklist from %s: %s", url, err)
-			continue
-		}
-		resp.Body.Close()
 		out = append(out, entries...)
 	}
 

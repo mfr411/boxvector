@@ -96,3 +96,9 @@ func TestUtilPtrDeref(t *testing.T) {
 	assert.Equal(t, "foo", StrDeref(Ptr("foo")))
 	assert.Equal(t, "", StrDeref(nil))
 }
+
+func TestSanitizeNoUsableChars(t *testing.T) {
+	if got := *Sanitize("!!!"); got != "PEER" {
+		t.Errorf("Sanitize(\"!!!\") = %q, want PEER", got)
+	}
+}
