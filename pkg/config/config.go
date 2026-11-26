@@ -332,7 +332,7 @@ type Config struct {
 	BIRDThreads           int    `yaml:"bird-threads" description:"BIRD 3 worker threads (0 = BIRD default, ignored on BIRD 2)" default:"0"`
 	BIRDVersion           string `yaml:"-" description:"-"`
 	BIRDMajor             int    `yaml:"-" description:"-"`
-	CacheDirectory        string `yaml:"cache-directory" description:"Directory to store runtime configuration cache" default:"/var/run/pathvector/cache/"`
+	CacheDirectory        string `yaml:"cache-directory" description:"Directory to store runtime configuration cache" default:"/var/lib/boxvector/cache/"`
 	KeepalivedConfig      string `yaml:"keepalived-config" description:"Configuration file for keepalived" default:"/etc/keepalived.conf"`
 	WebUIFile             string `yaml:"web-ui-file" description:"File to write web UI to (disabled if empty)" default:""`
 	LogFile               string `yaml:"log-file" description:"Log file location" default:"syslog"`

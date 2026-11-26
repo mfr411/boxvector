@@ -23,3 +23,8 @@ test-teardown:
 	rm -f nohup.out
 
 test-sequence: test-setup test test-teardown
+
+docs:
+	docs/generate.sh
+
+.PHONY: docs

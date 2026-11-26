@@ -31,7 +31,7 @@ var (
 
 // CLI Commands
 var rootCmd = &cobra.Command{
-	Use:   "pathvector",
+	Use:   "boxvector",
 	Short: "Boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).",
 }
 
@@ -59,7 +59,7 @@ func init() {
 			log.SetLevel(log.TraceLevel)
 		}
 	})
-	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "/etc/pathvector.yml", "YAML configuration file")
+	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "/etc/boxvector/boxvector.yml", "YAML configuration file")
 	rootCmd.PersistentFlags().StringVar(&lockFile, "lock", "", "Lock file (check disabled if empty)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Show verbose log messages")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "trace", "t", false, "Show trace log messages")

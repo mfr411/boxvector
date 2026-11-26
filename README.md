@@ -111,8 +111,8 @@ peers:
       - 2001:db8:ffff::1
 ```
 
-All options are documented in [docs/](docs/). Peers can also be added later
-from the web UI.
+All options are listed in [docs/configuration.md](docs/configuration.md)
+(generated from the code). Peers can also be added later from the web UI.
 
 Test without touching BIRD (generates and validates only):
 
@@ -235,6 +235,45 @@ Generated BIRD files in `/etc/bird` are never removed by the package.
 
 ---
 
+## CLI
+
+Full reference per command: [docs/cli.md](docs/cli.md).
+
+<!-- cli:begin -->
+```
+Boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).
+
+Usage:
+  boxvector [command]
+
+Available Commands:
+  birdsh      Lightweight BIRD shell
+  completion  Generate the autocompletion script for the specified shell
+  config      Export configuration, optionally sanitized with logknife
+  dump        Dump configuration
+  generate    Generate router configuration
+  help        Help about any command
+  match       Find common IXPs for a given ASN
+  optimizer   Start optimization daemon
+  status      Show protocol status
+  version     Show version information
+  web         Run the web UI
+
+Flags:
+  -c, --config string   YAML configuration file (default "/etc/boxvector/boxvector.yml")
+  -d, --dry-run         Don't modify configuration
+  -h, --help            help for boxvector
+      --lock string     Lock file (check disabled if empty)
+  -n, --no-configure    Don't configure BIRD
+  -t, --trace           Show trace log messages
+  -v, --verbose         Show verbose log messages
+
+Use "boxvector [command] --help" for more information about a command.
+```
+<!-- cli:end -->
+
+---
+
 ## Building from source
 
 Requires Go (version in `go.mod`), `dpkg-deb`.
@@ -244,6 +283,10 @@ go build -o boxvector .
 packaging/deb/build.sh 0.1.0 amd64 dist      # dist/boxvector_0.1.0_amd64.deb
 packaging/deb/build.sh 0.1.0 arm64 dist
 ```
+
+`docs/configuration.md`, `docs/cli.md` and the CLI block above are generated
+by `docs/generate.sh` (`make docs`); CI regenerates and commits them on every
+push, so they always match the code.
 
 Pushing a tag `v*` builds both packages in CI and attaches them to a GitHub
 release. CI also checks every config in `tests/` against BIRD 2.0.12, 2.20.0,
