@@ -28,13 +28,14 @@ for cfg in "$root"/tests/generate-*.yml; do
   out="$work/$name"
   mkdir -p "$out/bird" "$out/cache"
   # point every path at the temp dir and enable BIRD 3 threads (ignored on BIRD 2)
-  grep -vE '^(bird-directory|bird-binary|bird-socket|cache-directory|web-ui-file|bird-threads):' "$cfg" > "$out/cfg.yml"
+  grep -vE '^(bird-directory|bird-binary|bird-socket|cache-directory|web-ui-file|keepalived-config|bird-threads):' "$cfg" > "$out/cfg.yml"
   cat >> "$out/cfg.yml" <<EOF
 bird-directory: $out/bird/
 bird-binary: $bird
 bird-socket: $out/bird.ctl
 cache-directory: $out/cache
 web-ui-file: $out/ui.html
+keepalived-config: $out/keepalived.conf
 bird-threads: 2
 EOF
   if ! (cd "$root" && "$bv" generate -c "$out/cfg.yml" --no-configure) > "$out/gen.log" 2>&1; then

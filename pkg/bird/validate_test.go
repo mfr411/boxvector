@@ -15,6 +15,9 @@ func TestValidationErrorFormats(t *testing.T) {
 }
 
 func TestVersion(t *testing.T) {
+	if ma, _, pa, ok := ParseVersion("BIRD version v2.0.12"); !ok || ma != 2 || pa != 12 {
+		t.Error("parse v2.0.12")
+	}
 	if ma, mi, pa, ok := ParseVersion("BIRD version 3.4.0"); !ok || ma != 3 || mi != 4 || pa != 0 {
 		t.Error("parse 3.4.0")
 	}

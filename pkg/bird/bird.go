@@ -139,7 +139,7 @@ func RunCommand(command string, socket string) (string, string, error) {
 // reValidationError matches "<file>:<line>:<col> <message>" in BIRD 2 and BIRD 3 output
 var reValidationError = regexp.MustCompile(`(?m)(\S+\.conf):(\d+):(\d+)\s+(.*)$`)
 
-var reVersion = regexp.MustCompile(`BIRD version (\d+)\.(\d+)(?:\.(\d+))?`)
+var reVersion = regexp.MustCompile(`BIRD version v?(\d+)\.(\d+)(?:\.(\d+))?`)
 
 // ParseVersion returns major, minor, patch from "2.20.0" or "BIRD version 3.4.0".
 func ParseVersion(s string) (int, int, int, bool) {
@@ -179,7 +179,7 @@ func BinaryVersion(binary string) (string, error) {
 	defer cancel()
 	out, err := exec.CommandContext(ctx, binary, "--version").CombinedOutput()
 	if m := reVersion.FindString(string(out)); m != "" {
-		return strings.TrimPrefix(m, "BIRD version "), nil
+		return strings.TrimPrefix(strings.TrimPrefix(m, "BIRD version "), "v"), nil
 	}
 	if err == nil {
 		err = fmt.Errorf("unexpected output %q", strings.TrimSpace(string(out)))

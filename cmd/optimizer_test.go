@@ -17,6 +17,11 @@ func TestOptimizer(t *testing.T) {
 	assert.Nil(t, err)
 	assert.GreaterOrEqual(t, 1, len(files))
 
+	// cobra flags are package globals: TestGenerate leaves --dry-run set,
+	// which would stop the pre-optimizer generate from writing peer files.
+	dryRun = false
+	defer func() { dryRun = false }()
+
 	for _, testFile := range files {
 		// Run pathvector to generate config first, so there is a config to modify
 		rootCmd.SetArgs(append(args, []string{
