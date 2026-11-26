@@ -3,6 +3,7 @@ package bird
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net"
@@ -13,9 +14,9 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/mod/semver"
 
 	"github.com/mfr411/boxvector/pkg/util"
 )
@@ -114,7 +115,7 @@ func RunCommand(command string, socket string) (string, string, error) {
 
 	// Check BIRD version
 	birdVersion := strings.Split(resp, " ")[1]
-	if semver.Compare(birdVersion, supportedMin) == -1 {
+	if !AtLeast(birdVersion, supportedMin) {
 		log.Warnf("BIRD version %s older than minimum supported version %s", birdVersion, supportedMin)
 	}
 
@@ -137,6 +138,54 @@ func RunCommand(command string, socket string) (string, string, error) {
 
 // reValidationError matches "<file>:<line>:<col> <message>" in BIRD 2 and BIRD 3 output
 var reValidationError = regexp.MustCompile(`(?m)(\S+\.conf):(\d+):(\d+)\s+(.*)$`)
+
+var reVersion = regexp.MustCompile(`BIRD version (\d+)\.(\d+)(?:\.(\d+))?`)
+
+// ParseVersion returns major, minor, patch from "2.20.0" or "BIRD version 3.4.0".
+func ParseVersion(s string) (int, int, int, bool) {
+	if !strings.Contains(s, "BIRD version") {
+		s = "BIRD version " + strings.TrimPrefix(strings.TrimSpace(s), "v")
+	}
+	m := reVersion.FindStringSubmatch(s)
+	if m == nil {
+		return 0, 0, 0, false
+	}
+	ma, _ := strconv.Atoi(m[1])
+	mi, _ := strconv.Atoi(m[2])
+	pa, _ := strconv.Atoi(m[3])
+	return ma, mi, pa, true
+}
+
+// AtLeast reports whether version v >= min (numeric compare; the previous
+// semver check never fired because BIRD versions have no "v" prefix).
+func AtLeast(v, min string) bool {
+	a1, b1, c1, ok1 := ParseVersion(v)
+	a2, b2, c2, ok2 := ParseVersion(min)
+	if !ok1 || !ok2 {
+		return true // unknown: do not warn spuriously
+	}
+	if a1 != a2 {
+		return a1 > a2
+	}
+	if b1 != b2 {
+		return b1 > b2
+	}
+	return c1 >= c2
+}
+
+// BinaryVersion runs "<binary> --version" and returns e.g. "3.4.0".
+func BinaryVersion(binary string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binary, "--version").CombinedOutput()
+	if m := reVersion.FindString(string(out)); m != "" {
+		return strings.TrimPrefix(m, "BIRD version "), nil
+	}
+	if err == nil {
+		err = fmt.Errorf("unexpected output %q", strings.TrimSpace(string(out)))
+	}
+	return "", err
+}
 
 // Validate checks if the cached configuration is syntactically valid
 func Validate(binary string, cacheDir string) {

@@ -13,6 +13,7 @@ import (
 const irrQueryTimeout = 10
 
 func TestGetIRRPrefixSet(t *testing.T) {
+	util.NeedsInternet(t) // compares live IRR data, which drifts over time
 	testCases := []struct {
 		asSet          string
 		family         uint8
@@ -38,6 +39,7 @@ func TestGetIRRPrefixSet(t *testing.T) {
 }
 
 func TestBuildIRRPrefixSet(t *testing.T) {
+	util.NeedsInternet(t)
 	testCases := []struct {
 		asSet       string
 		prefixSet4  []string
@@ -64,6 +66,7 @@ func TestBuildIRRPrefixSet(t *testing.T) {
 }
 
 func TestIRRASMembers(t *testing.T) {
+	util.NeedsInternet(t)
 	testCases := []struct {
 		asSet       string
 		asMembers   []uint32

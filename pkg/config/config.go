@@ -329,6 +329,9 @@ type Config struct {
 	BIRDDirectory         string `yaml:"bird-directory" description:"Directory to store BIRD configs" default:"/etc/bird/"`
 	BIRDBinary            string `yaml:"bird-binary" description:"Path to BIRD binary" default:"/usr/sbin/bird"`
 	BIRDSocket            string `yaml:"bird-socket" description:"UNIX control socket for BIRD" default:"/run/bird/bird.ctl"`
+	BIRDThreads           int    `yaml:"bird-threads" description:"BIRD 3 worker threads (0 = BIRD default, ignored on BIRD 2)" default:"0"`
+	BIRDVersion           string `yaml:"-" description:"-"`
+	BIRDMajor             int    `yaml:"-" description:"-"`
 	CacheDirectory        string `yaml:"cache-directory" description:"Directory to store runtime configuration cache" default:"/var/run/pathvector/cache/"`
 	KeepalivedConfig      string `yaml:"keepalived-config" description:"Configuration file for keepalived" default:"/etc/keepalived.conf"`
 	WebUIFile             string `yaml:"web-ui-file" description:"File to write web UI to (disabled if empty)" default:""`

@@ -13,3 +13,14 @@ func TestValidationErrorFormats(t *testing.T) {
 		}
 	}
 }
+
+func TestVersion(t *testing.T) {
+	if ma, mi, pa, ok := ParseVersion("BIRD version 3.4.0"); !ok || ma != 3 || mi != 4 || pa != 0 {
+		t.Error("parse 3.4.0")
+	}
+	for v, want := range map[string]bool{"2.0.7": true, "2.20.0": true, "3.0": true, "2.0.6": false, "1.6.8": false} {
+		if AtLeast(v, "2.0.7") != want {
+			t.Errorf("AtLeast(%s) != %v", v, want)
+		}
+	}
+}

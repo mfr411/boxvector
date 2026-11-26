@@ -230,3 +230,12 @@ func YAMLUnmarshalStrict(y []byte, v interface{}) error {
 	decoder.KnownFields(true)
 	return decoder.Decode(v)
 }
+
+// NeedsInternet skips a test that queries live internet services (IRR,
+// PeeringDB) unless BOXVECTOR_NET_TESTS=1. Live data changes over time, so
+// these tests are opt-in to keep CI deterministic.
+func NeedsInternet(t interface{ Skip(...any) }) {
+	if os.Getenv("BOXVECTOR_NET_TESTS") != "1" {
+		t.Skip("set BOXVECTOR_NET_TESTS=1 to run tests against live internet data")
+	}
+}

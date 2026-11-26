@@ -4,42 +4,57 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
-    name: test
-    runs-on: ubuntu-latest
+  unit:
+    name: unit tests
+    runs-on: ubuntu-24.04
     steps:
-      - name: Install bgpq4 and bird2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install bgpq4, bird2, flask
         run: |
-          wget http://ftp.us.debian.org/debian/pool/main/b/bgpq4/bgpq4_0.0.6-2_amd64.deb
-          sudo dpkg -i bgpq4*.deb
-          sudo apt install -y bird2
-
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '1.20'
-          cache: false
-
-      - uses: actions/checkout@v3
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v3
-        with:
-          args: -E gosec
-
-      - run: go get -v -t -d ./...
-      - run: sudo chown $(whoami):$(whoami) /run/bird/bird.ctl
-      - run: sudo chown -R $(whoami):$(whoami) /etc/bird/
-      - run: go generate -x
+          sudo apt-get update -q
+          sudo apt-get install -y -q bgpq4 bird2 python3-flask
+          sudo chown "$(whoami)" /run/bird/bird.ctl
+          sudo chown -R "$(whoami)" /etc/bird/
+      - name: gofmt
+        run: test -z "$(gofmt -l cmd pkg main.go)" || (gofmt -l cmd pkg main.go && exit 1)
+      - run: go vet ./...
       - run: go build -v .
-      - run: make dep
       - run: make test-setup
       - run: make test
-
-      - name: Upload coverage report
-        uses: codecov/codecov-action@v1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          file: ./coverage.txt
-
       - run: make test-teardown
+        if: always()
+
+  bird-matrix:
+    name: BIRD ${{ matrix.bird }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        # Debian 12 ships 2.0.12; latest 2.x; first and latest 3.x lines
+        bird: ["2.0.12", "2.20.0", "3.1.9", "3.4.0"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q build-essential flex bison libncurses-dev libreadline-dev libssh-dev autoconf python3-flask
+      - uses: actions/cache@v4
+        id: bird
+        with:
+          path: ~/bird-${{ matrix.bird }}
+          key: bird-${{ matrix.bird }}-ubuntu-24.04
+      - if: steps.bird.outputs.cache-hit != 'true'
+        run: tests/bird-matrix/build-bird.sh ${{ matrix.bird }} ~/bird-${{ matrix.bird }}
+      - run: go build -o boxvector .
+      - run: make peeringdb-test-harness && sleep 2
+      - run: tests/bird-matrix/check.sh ./boxvector ~/bird-${{ matrix.bird }}/sbin/bird

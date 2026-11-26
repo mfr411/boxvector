@@ -1,5 +1,5 @@
 dep:
-	pip3 install flask
+	python3 -c "import flask" 2>/dev/null || pip3 install flask
 
 dummy-iface:
 	# Allow UDP ping. For more information, see https://github.com/go-ping/ping#linux

@@ -668,6 +668,18 @@ func Run(configFilename, lockFile, version string, noConfigure, dryRun, withdraw
 
 	// Create the global output file
 	log.Debug("Creating global config")
+	// Detect the BIRD version so templates can use BIRD 3 only options.
+	if v, err := bird.BinaryVersion(c.BIRDBinary); err != nil {
+		log.Warnf("Unable to detect BIRD version from %s: %s (assuming BIRD 2 syntax)", c.BIRDBinary, err)
+	} else {
+		c.BIRDVersion = v
+		c.BIRDMajor, _, _, _ = bird.ParseVersion(v)
+		log.Infof("BIRD version %s", v)
+		if c.BIRDThreads > 0 && c.BIRDMajor < 3 {
+			log.Warnf("bird-threads is set but BIRD %s does not support threads, ignoring", v)
+		}
+	}
+
 	globalFile, err := os.Create(path.Join(c.CacheDirectory, "bird.conf"))
 	if err != nil {
 		log.Fatalf("Create global BIRD output file: %v", err)

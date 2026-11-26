@@ -2,6 +2,9 @@
 
 define ASN = {{ .ASN }};
 router id {{ .RouterID }};
+{{- if and (ge .BIRDMajor 3) (gt .BIRDThreads 0) }}
+threads {{ .BIRDThreads }};
+{{- end }}
 
 {{ if .Prefixes4 -}}
 define LOCALv4 = [
