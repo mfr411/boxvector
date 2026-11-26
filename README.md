@@ -324,7 +324,7 @@ Full reference per command: [docs/cli.md](docs/cli.md).
 
 <!-- cli:begin -->
 ```
-Boxvector generates and manages BIRD 2/3 BGP configuration (inspired by Pathvector).
+Boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).
 
 Usage:
   boxvector [command]
