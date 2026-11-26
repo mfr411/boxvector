@@ -39,7 +39,7 @@ func Diff(a, b string, ctx int) []DiffLine {
 			all = append(all, DiffLine{' ', x[i]})
 			i++
 			j++
-		case j < m && (i == n || lcs[i][j+1] >= lcs[i+1][j]):
+		case j < m && (i == n || lcs[i][j+1] > lcs[i+1][j]): // deletions first, like diff -u
 			all = append(all, DiffLine{'+', y[j]})
 			j++
 		default:
