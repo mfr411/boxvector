@@ -8,4 +8,4 @@
 <div class="menu"><span>Signed in as {{.User}}</span><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button>Sign out</button></form></div></details>
 </header>{{end}}
 <main>{{template "body" .}}</main>
-<footer>{{if .User}}Boxvector {{.Version}} · {{end}}Based on <a href="https://github.com/natesales/pathvector" rel="noopener" target="_blank">Pathvector</a> by Nate Sales</footer></body></html>{{end}}
+<footer>{{if .User}}Boxvector {{.Version}} · {{end}}Inspired by <a href="https://github.com/natesales/pathvector" rel="noopener" target="_blank">Pathvector</a> by Nate Sales</footer></body></html>{{end}}

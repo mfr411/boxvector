@@ -9,7 +9,7 @@
 
 Boxvector generates and manages BGP configuration for [BIRD](https://bird.nic.cz)
 2 and 3 from a single YAML file, with a web UI for day-to-day operations.
-It is a fork of [Pathvector](https://github.com/natesales/pathvector) focused on
+Inspired by [Pathvector](https://github.com/natesales/pathvector), it focuses on
 BIRD 3, security hardening and a web interface.
 
 - One YAML file describes your ASN, prefixes, templates and peers.
@@ -324,7 +324,7 @@ Full reference per command: [docs/cli.md](docs/cli.md).
 
 <!-- cli:begin -->
 ```
-Boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).
+Boxvector generates and manages BIRD 2/3 BGP configuration (inspired by Pathvector).
 
 Usage:
   boxvector [command]
@@ -380,8 +380,8 @@ release. CI also checks every config in `tests/` against BIRD 2.0.12, 2.20.0,
 Boxvector is built on top of open-source work by others:
 
 - **[Pathvector](https://github.com/natesales/pathvector)** by
-  [Nate Sales](https://github.com/natesales) and contributors – the original
-  project this fork is based on (config model, templates, IRR/RPKI/PeeringDB
+  [Nate Sales](https://github.com/natesales) and contributors – the project that
+  inspired Boxvector (config model, templates, IRR/RPKI/PeeringDB
   filtering, optimizer). Thank you.
 - **[BIRD Internet Routing Daemon](https://bird.nic.cz)** by CZ.NIC Labs.
 - **[bgpq4](https://github.com/bgp/bgpq4)** for IRR prefix lists,
