@@ -74,3 +74,12 @@ aside h3{margin-top:6px}
 
 footer{padding:18px 24px;color:var(--mu);font-size:12px;text-align:center}
 footer a{color:var(--mu)}
+.frm{max-width:760px}
+.frm h3{margin:10px 0 0}
+.rg{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+.rl{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 0 8px 10px;border-top:1px solid var(--ln);color:var(--fg);font-size:13px}
+.rl small{display:block;color:var(--mu);font-size:11px}
+.rl select{width:130px;flex:none;font:inherit;padding:4px 8px;border:1px solid var(--ln);border-radius:6px;background:#fff}
+.rl select.ov{border-color:var(--fg);font-weight:600;background:#f2f2f4}
+.rl:has(select.ov){box-shadow:inset 2px 0 0 var(--fg)}
+@media(max-width:800px){.rg{grid-template-columns:1fr}}

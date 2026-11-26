@@ -11,7 +11,7 @@ define LOCALv4 = [
 {{ BirdSet .Prefixes4 }}
 ];
 {{- end }}
-{{ if or .Prefixes4 .Kernel.Statics4 }}
+{{ if or .Prefixes4 .Kernel.Statics4 .Kernel.StaticList4 }}
 protocol static static4 {
   ipv4;
   {{- range $i, $prefix := .Prefixes4 }}
@@ -19,6 +19,12 @@ protocol static static4 {
   {{- end }}
   {{- range $prefix, $nexthop := MapDeref .Kernel.Statics4 }}
   route {{ $prefix }} via {{ $nexthop }};
+  {{- end }}
+  {{- range .Kernel.StaticList4 }}
+  {{- if .Comment }}
+  # {{ .Comment }}
+  {{- end }}
+  route {{ .Prefix }}{{ if eq .Type "unicast" }} via {{ .Via }}{{ else }} {{ .Type }}{{ end }}{{ if .Distance }} { preference = {{ .Distance }}; }{{ end }};
   {{- end }}
 }
 {{- end }}
@@ -28,7 +34,7 @@ define LOCALv6 = [
 {{ BirdSet .Prefixes6 }}
 ];
 {{- end }}
-{{ if or .Prefixes6 .Kernel.Statics6 }}
+{{ if or .Prefixes6 .Kernel.Statics6 .Kernel.StaticList6 }}
 protocol static static6 {
   ipv6;
   {{- range $i, $prefix := .Prefixes6 }}
@@ -36,6 +42,12 @@ protocol static static6 {
   {{- end }}
   {{- range $prefix, $nexthop := .Kernel.Statics6 }}
   route {{ $prefix }} via {{ $nexthop }};
+  {{- end }}
+  {{- range .Kernel.StaticList6 }}
+  {{- if .Comment }}
+  # {{ .Comment }}
+  {{- end }}
+  route {{ .Prefix }}{{ if eq .Type "unicast" }} via {{ .Via }}{{ else }} {{ .Type }}{{ end }}{{ if .Distance }} { preference = {{ .Distance }}; }{{ end }};
   {{- end }}
 }
 {{- end }}

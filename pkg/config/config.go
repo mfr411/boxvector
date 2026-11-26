@@ -274,12 +274,23 @@ type MRTInstance struct {
 }
 
 // Kernel stores options that relate to the OS kernel
+// StaticRoute is one entry of kernel.static-routes.
+// Type "unicast" (default) needs Via; blackhole, unreachable and prohibit do not.
+type StaticRoute struct {
+	Prefix   string `yaml:"prefix" description:"Destination prefix (CIDR)"`
+	Via      string `yaml:"via" description:"Next hop IP (optional %interface suffix); empty for blackhole/unreachable/prohibit"`
+	Type     string `yaml:"type" description:"unicast, blackhole, unreachable or prohibit" default:"unicast"`
+	Distance int    `yaml:"distance" description:"BIRD route preference 1-255 (0 = BIRD default)"`
+	Comment  string `yaml:"comment" description:"Free text, written as a BIRD comment"`
+}
+
 type Kernel struct {
 	Accept4         []string          `yaml:"accept4" description:"List of BIRD protocols to import into the IPv4 table"`
 	Accept6         []string          `yaml:"accept6" description:"List of BIRD protocols to import into the IPv6 table"`
 	Reject4         []string          `yaml:"reject4" description:"List of BIRD protocols to not import into the IPv4 table"`
 	Reject6         []string          `yaml:"reject6" description:"List of BIRD protocols to not import into the IPv6 table"`
 	Statics         map[string]string `yaml:"statics" description:"List of static routes to include in BIRD"`
+	StaticRoutes    []StaticRoute     `yaml:"static-routes" description:"Static routes with type, distance and comment (extends statics)"`
 	SRDCommunities  []string          `yaml:"srd-communities" description:"List of communities to filter routes exported to kernel (if list is not empty, all other prefixes will not be exported)"`
 	Learn           bool              `yaml:"learn" description:"Should routes from the kernel be learned into BIRD?" default:"false"`
 	Export          bool              `yaml:"export" description:"Export routes to kernel routing table" default:"true"`
@@ -290,6 +301,8 @@ type Kernel struct {
 	SRDStandardCommunities []string          `yaml:"-" description:"-"`
 	SRDLargeCommunities    []string          `yaml:"-" description:"-"`
 	Statics4               map[string]string `yaml:"-" description:"-"`
+	StaticList4            []StaticRoute     `yaml:"-" description:"-"`
+	StaticList6            []StaticRoute     `yaml:"-" description:"-"`
 	Statics6               map[string]string `yaml:"-" description:"-"`
 }
 

@@ -318,21 +318,62 @@ func (s *server) peersPage(w http.ResponseWriter, r *http.Request, sess *session
 		Data: map[string]any{"Rows": rows, "Sum": sum, "Err": errMsg}})
 }
 
+// ---- policy rules (tri-state per peer: inherit / on / off) ----
+
+type ruleDef struct {
+	Key, Label, Hint string
+	Def              bool // global default when neither peer nor template sets it
+}
+
+var peerRules = []ruleDef{
+	{"filter-bogon-routes", "Bogon prefixes", "Reject RFC1918, reserved and documentation prefixes", true},
+	{"filter-bogon-asns", "Bogon ASNs", "Reject paths containing private or reserved ASNs", true},
+	{"filter-rpki", "RPKI invalid", "Drop routes with RPKI status invalid", true},
+	{"strict-rpki", "Strict RPKI", "Accept RPKI valid only", false},
+	{"filter-irr", "IRR prefix filter", "Only accept prefixes registered in the peer's IRR as-set", false},
+	{"filter-as-set", "AS-SET origin", "Reject routes not originated by an ASN in the peer's AS-SET", false},
+	{"filter-max-prefix", "Max-prefix", "Enforce the import limit on this session", true},
+	{"filter-prefix-length", "Prefix length", "Reject IPv4 outside /8-/24 and IPv6 outside /12-/48", true},
+	{"filter-transit-asns", "Transit ASNs (Peerlock Lite)", "Reject paths containing transit-free ASNs", false},
+	{"enforce-first-as", "Enforce first AS", "First AS in the path must be the peer's ASN", true},
+	{"remove-private-asns", "Remove private ASNs", "Strip private ASNs from the path on export", true},
+	{"filter-blocklist", "Blocklist", "Reject ASNs and prefixes in the global blocklist", true},
+}
+
+func ruleKeys() []string {
+	k := make([]string, len(peerRules))
+	for i, r := range peerRules {
+		k[i] = "r_" + r.Key
+	}
+	return k
+}
+
+func peerFormData(f map[string]string, errMsg string) map[string]any {
+	if f == nil {
+		f = map[string]string{}
+	}
+	d := map[string]any{"Rules": peerRules, "F": f}
+	if errMsg != "" {
+		d["Err"] = errMsg
+	}
+	return d
+}
+
 // ---- add peer ----
 
 var reName = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9 ._\-]{0,63}$`)
 
 func (s *server) peerNewPage(w http.ResponseWriter, r *http.Request, sess *session) {
-	s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: map[string]any{}})
+	s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: peerFormData(nil, "")})
 }
 
 func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *session) {
 	f := map[string]string{}
-	for _, k := range []string{"name", "asn", "neighbors", "description", "template", "limit4", "limit6", "asset"} {
+	for _, k := range append([]string{"name", "asn", "neighbors", "description", "template", "limit4", "limit6", "asset"}, ruleKeys()...) {
 		f[k] = strings.TrimSpace(r.PostFormValue(k))
 	}
 	fail := func(msg string) {
-		s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"F": f, "Err": msg}})
+		s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: peerFormData(f, msg)})
 	}
 	if !reName.MatchString(f["name"]) {
 		fail("Name: letters, digits, space, dot, dash or underscore (max 64).")
@@ -391,6 +432,18 @@ func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *sessi
 				return
 			}
 			add("import-"+l, scalar(strconv.Itoa(n), "!!int"))
+		}
+	}
+	for _, rd := range peerRules {
+		switch f["r_"+rd.Key] {
+		case "", "inherit":
+		case "on":
+			add(rd.Key, scalar("true", "!!bool"))
+		case "off":
+			add(rd.Key, scalar("false", "!!bool"))
+		default:
+			fail("Invalid value for " + rd.Label + ".")
+			return
 		}
 	}
 	nl := &yaml.Node{Kind: yaml.SequenceNode}

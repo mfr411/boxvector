@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"reflect"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -430,6 +431,10 @@ func Load(configBlob []byte) (*config.Config, error) {
 		}
 	}
 
+	if err := parseStaticRoutes(&c); err != nil {
+		return nil, err
+	}
+
 	// Parse BFD configs
 	for instanceName, bfdInstance := range c.BFDInstances {
 		if net.ParseIP(*bfdInstance.Neighbor) == nil {
@@ -775,4 +780,55 @@ func countSessions(peers map[string]*config.Peer) int {
 		count += len(*p.NeighborIPs)
 	}
 	return count
+}
+
+var staticCommentRe = regexp.MustCompile(`[^A-Za-z0-9 ._:/,()+-]`)
+
+// parseStaticRoutes validates kernel.static-routes and splits them per address family.
+func parseStaticRoutes(c *config.Config) error {
+	seen := map[string]bool{}
+	for i := range c.Kernel.StaticRoutes {
+		r := &c.Kernel.StaticRoutes[i]
+		_, ipn, err := net.ParseCIDR(r.Prefix)
+		if err != nil {
+			return fmt.Errorf("static-routes[%d]: invalid prefix %q", i, r.Prefix)
+		}
+		if ipn.String() != r.Prefix {
+			return fmt.Errorf("static-routes[%d]: %q has host bits set, use %s", i, r.Prefix, ipn.String())
+		}
+		v6 := ipn.IP.To4() == nil
+		if r.Type == "" {
+			r.Type = "unicast"
+		}
+		switch r.Type {
+		case "unicast":
+			nh := net.ParseIP(strings.Split(r.Via, "%")[0])
+			if nh == nil {
+				return fmt.Errorf("static-routes[%d]: %s needs a valid via address", i, r.Prefix)
+			}
+			if (nh.To4() == nil) != v6 {
+				return fmt.Errorf("static-routes[%d]: via %s is not the same address family as %s", i, r.Via, r.Prefix)
+			}
+		case "blackhole", "unreachable", "prohibit":
+			if r.Via != "" {
+				return fmt.Errorf("static-routes[%d]: type %s cannot have via", i, r.Type)
+			}
+		default:
+			return fmt.Errorf("static-routes[%d]: unknown type %q", i, r.Type)
+		}
+		if r.Distance < 0 || r.Distance > 255 {
+			return fmt.Errorf("static-routes[%d]: distance must be 0-255", i)
+		}
+		if seen[r.Prefix] {
+			return fmt.Errorf("static-routes[%d]: duplicate prefix %s", i, r.Prefix)
+		}
+		seen[r.Prefix] = true
+		r.Comment = staticCommentRe.ReplaceAllString(r.Comment, "")
+		if v6 {
+			c.Kernel.StaticList6 = append(c.Kernel.StaticList6, *r)
+		} else {
+			c.Kernel.StaticList4 = append(c.Kernel.StaticList4, *r)
+		}
+	}
+	return nil
 }

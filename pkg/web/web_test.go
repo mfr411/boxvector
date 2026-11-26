@@ -1,6 +1,7 @@
 package web
 
 import (
+	"html/template"
 	"os"
 	"path/filepath"
 	"strings"
@@ -61,5 +62,31 @@ func TestPasswordFile(t *testing.T) {
 	}
 	if _, _, ok := a.login("1.2.3.4", "admin", "a-long-password"); !ok {
 		t.Error("right password rejected")
+	}
+}
+
+func TestPeerRulesTriState(t *testing.T) {
+	seen := map[string]bool{}
+	for _, r := range peerRules {
+		if seen[r.Key] || r.Label == "" {
+			t.Errorf("bad rule %+v", r)
+		}
+		seen[r.Key] = true
+	}
+	if len(ruleKeys()) != len(peerRules) || ruleKeys()[0] != "r_filter-bogon-routes" {
+		t.Errorf("ruleKeys %v", ruleKeys())
+	}
+}
+
+func TestPeerNewTemplateRenders(t *testing.T) {
+	tp := template.Must(template.New("").ParseFS(assets, "templates/layout.html", "templates/peer_new.html"))
+	for name, f := range map[string]map[string]string{"empty": nil, "filled": {"r_filter-rpki": "off", "name": "x"}} {
+		var b strings.Builder
+		if err := tp.ExecuteTemplate(&b, "layout", ctxPage{Title: "Add peer", Data: peerFormData(f, "")}); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if strings.Count(b.String(), "<select name=\"r_") != len(peerRules) {
+			t.Errorf("%s: expected %d rule selects", name, len(peerRules))
+		}
 	}
 }
