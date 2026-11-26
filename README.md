@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/boxvector-logo-white.svg">
+    <img src="assets/boxvector-logo.svg" alt="Boxvector" width="320">
+  </picture>
+</p>
+
 # Boxvector
 
 Boxvector generates and manages BGP configuration for [BIRD](https://bird.nic.cz)
