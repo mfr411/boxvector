@@ -18,7 +18,7 @@ func init() {
 }
 
 func versionBanner() string {
-	buf := fmt.Sprintf(`Pathvector %s
+	buf := fmt.Sprintf(`Boxvector %s
 Built %s on %s
 `, version, commit, date)
 	if len(plugin.Get()) > 0 {

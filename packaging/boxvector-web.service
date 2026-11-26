@@ -1,0 +1,48 @@
+[Unit]
+Description=Boxvector web UI
+Documentation=https://github.com/mfr411/boxvector
+After=network-online.target bird.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=boxvector
+Group=boxvector
+# bird group: write /etc/bird and talk to /run/bird/bird.ctl
+SupplementaryGroups=bird
+ExecStart=/usr/bin/boxvector web -c /etc/boxvector/boxvector.yml \
+  --listen 127.0.0.1:8180 --state-dir /var/lib/boxvector/web \
+  --auth-file /etc/boxvector/web.users
+Restart=on-failure
+RestartSec=5
+
+StateDirectory=boxvector
+UMask=0027
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc/bird /etc/boxvector /var/lib/boxvector -/run/bird
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+AmbientCapabilities=
+MemoryMax=512M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

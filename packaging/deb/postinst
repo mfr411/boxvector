@@ -1,0 +1,27 @@
+#!/bin/sh
+set -e
+if [ "$1" = configure ]; then
+  if ! getent passwd boxvector >/dev/null; then
+    adduser --system --group --home /var/lib/boxvector --no-create-home \
+      --shell /usr/sbin/nologin --quiet boxvector
+  fi
+  getent group bird >/dev/null && adduser --quiet boxvector bird || true
+  install -d -o boxvector -g boxvector -m 0750 /etc/boxvector /var/lib/boxvector /var/lib/boxvector/cache
+  if [ ! -e /etc/boxvector/boxvector.yml ]; then
+    install -o boxvector -g boxvector -m 0640 /usr/share/boxvector/boxvector.yml.example /etc/boxvector/boxvector.yml
+  fi
+  # let group bird (boxvector) write generated config
+  if [ -d /etc/bird ]; then
+    chgrp -R bird /etc/bird && chmod -R g+rwX /etc/bird && chmod 2775 /etc/bird || true
+  fi
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null || true
+    systemctl try-restart boxvector-web.service >/dev/null 2>&1 || true
+  fi
+  if [ ! -s /etc/boxvector/web.users ]; then
+    echo "boxvector: edit /etc/boxvector/boxvector.yml, then create a web user:"
+    echo "  sudo -u boxvector boxvector web passwd admin --auth-file /etc/boxvector/web.users"
+    echo "  sudo systemctl enable --now boxvector-web"
+  fi
+fi
+exit 0

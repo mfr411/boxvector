@@ -1,42 +1,28 @@
-name: goreleaser
+name: Release
 
 on:
   push:
     tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+' # symver vmajor.minor.patch format only
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
 
 jobs:
-  goreleaser:
-    runs-on: ubuntu-latest
+  deb:
+    runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
-          fetch-depth: 0
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.18
-
-      - name: Install PDF generation dependencies
+          go-version-file: go.mod
+      - name: Build .deb (amd64, arm64)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y pandoc texlive-xetex
-
-      - name: Store signing files
-        run: |
-          echo "$JUNIPER_KEY" | base64 -d > vendorbuild/juniper/key.pem
-          echo "$JUNIPER_CERT" | base64 -d > vendorbuild/juniper/cert.pem
-        shell: bash
+          v=${GITHUB_REF_NAME#v}
+          packaging/deb/build.sh "$v" amd64 dist
+          packaging/deb/build.sh "$v" arm64 dist
+          (cd dist && sha256sum *.deb > SHA256SUMS)
+      - name: Publish release
         env:
-          JUNIPER_KEY: ${{ secrets.JUNIPER_KEY }}
-          JUNIPER_CERT: ${{ secrets.JUNIPER_CERT }}
-
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
-        with:
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          FURY_TOKEN: ${{ secrets.FURY_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes

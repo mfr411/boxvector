@@ -1,0 +1,25 @@
+#!/bin/sh
+# Boxvector supports Debian >= 12 and Ubuntu >= 22.04 (and derivatives) only.
+set -e
+[ "$1" = install ] || [ "$1" = upgrade ] || exit 0
+[ -n "$BOXVECTOR_SKIP_OS_CHECK" ] && exit 0
+. /etc/os-release 2>/dev/null || { echo "boxvector: cannot read /etc/os-release" >&2; exit 1; }
+ids=" $ID $ID_LIKE "
+major=$(echo "${VERSION_ID:-0}" | cut -d. -f1)
+fail() {
+  echo "boxvector: unsupported OS: ${PRETTY_NAME:-unknown}" >&2
+  echo "boxvector: requires Debian 12 (bookworm) / Ubuntu 22.04 (jammy) or newer" >&2
+  exit 1
+}
+case "$ID" in
+  debian) [ "$major" -ge 12 ] 2>/dev/null || fail ;;
+  ubuntu) [ "$major" -ge 22 ] 2>/dev/null || fail ;;
+  *)
+    case "$ids" in
+      *" ubuntu "*) [ -n "$UBUNTU_CODENAME" ] || fail
+                    case "$UBUNTU_CODENAME" in trusty|xenial|bionic|focal|groovy|hirsute|impish) fail ;; esac ;;
+      *" debian "*) case "${DEBIAN_CODENAME:-$VERSION_CODENAME}" in wheezy|jessie|stretch|buster|bullseye) fail ;; esac ;;
+      *) fail ;;
+    esac ;;
+esac
+exit 0
