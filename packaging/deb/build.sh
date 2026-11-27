@@ -33,7 +33,7 @@ Version: $version
 Architecture: $arch
 Maintainer: nexcolo <https://www.nexcolo.com/>
 Depends: adduser, libc6 (>= 2.35), libcrypt1, openssl
-Recommends: bird3 | bird2, bgpq4
+Recommends: bird3 | bird2, bgpq4, ifupdown2
 Section: net
 Priority: optional
 Homepage: https://github.com/mfr411/boxvector

@@ -171,9 +171,9 @@ install_bird() {
       run apt-get update -qq
     fi
     [ -z "$cur" ] || [ "${cur%%.*}" = 3 ] || { warn "replacing BIRD $cur with BIRD 3 (config in /etc/bird is kept)"; }
-    run $APT install bird3 bgpq4
+    run $APT install bird3 bgpq4 ifupdown2
   else
-    run $APT install bird2 bgpq4
+    run $APT install bird2 bgpq4 ifupdown2
   fi
 }
 if [ "$ESTIMATE" != 1 ]; then log "BIRD ${BIRD}"; install_bird; fi
