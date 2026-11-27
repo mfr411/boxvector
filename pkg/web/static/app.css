@@ -387,3 +387,8 @@ tr.cfg.dis td{color:#888}.cmt{margin-left:6px}#rtb[hidden]{display:none}
 .tbg .btn:disabled{opacity:.55;cursor:default}
 .tbg .btn.dl:not(:disabled){color:#b3261e}
 #ift tr.sel td{background:#dbe7ff}
+.ift td.nm.sub.d2{padding-left:44px}
+.ift td.nm.sub.d3{padding-left:62px}
+.ift td.nm.sub.d4{padding-left:80px}
+.ift td.nm.sub.d5{padding-left:98px}
+.ift td.nm.sub.d6{padding-left:116px}

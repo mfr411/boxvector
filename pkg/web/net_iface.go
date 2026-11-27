@@ -214,6 +214,7 @@ func (m *ifMgr) rollback() error {
 	}
 	var err error
 	if structChanged(cur, m.state) {
+		removeGone(cur, m.state)
 		_, err = m.reload()
 	}
 	_ = applyAddrDiff(cur, m.state)
@@ -243,6 +244,7 @@ func (m *ifMgr) change(summary string, mutate func(s map[string]*ifc) error) err
 	// ifreload only when a VLAN/bridge is added/removed: reloading flaps links, so plain address/MTU
 	// changes on existing interfaces go through ip directly.
 	if structChanged(snap, m.state) {
+		removeGone(snap, m.state)
 		if out, err := m.reload(); err != nil {
 			_ = m.rollback()
 			return errors.New("ifreload failed, change reverted: " + out)
@@ -466,6 +468,11 @@ func (m *ifMgr) handle(w http.ResponseWriter, r *http.Request) {
 			if !ok || c.Kind == "addr" {
 				return errors.New("only VLANs and bridges created by boxvector can be deleted")
 			}
+			for _, o := range s {
+				if o.Parent == dev || containsStr(o.Ports, dev) {
+					return errors.New(o.Name + " still depends on " + dev + ": delete it first")
+				}
+			}
 			delete(s, dev)
 			return nil
 		})
@@ -661,6 +668,44 @@ func structChanged(a, b map[string]*ifc) bool {
 	}
 	for n, v := range x {
 		if y[n] != v {
+			return true
+		}
+	}
+	return false
+}
+
+// removeGone deletes from the kernel every VLAN/bridge that left the managed state. ifreload does not
+// remove them once their stanza is gone, and children must go before their parents.
+func removeGone(old, cur map[string]*ifc) {
+	var gone []*ifc
+	for n, c := range old {
+		if c.Kind == "addr" {
+			continue
+		}
+		if _, ok := cur[n]; !ok && devExists(n) {
+			gone = append(gone, c)
+		}
+	}
+	depth := func(c *ifc) int {
+		d := 0
+		for p := c.Parent; p != ""; d++ {
+			pc, ok := old[p]
+			if !ok || d > 8 {
+				break
+			}
+			p = pc.Parent
+		}
+		return d
+	}
+	sort.Slice(gone, func(i, j int) bool { return depth(gone[i]) > depth(gone[j]) })
+	for _, c := range gone {
+		_, _ = ipRun("link", "del", c.Name)
+	}
+}
+
+func containsStr(l []string, v string) bool {
+	for _, x := range l {
+		if x == v {
 			return true
 		}
 	}

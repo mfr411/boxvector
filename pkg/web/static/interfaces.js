@@ -12,8 +12,12 @@ ICV='<svg viewBox="0 0 16 16"><rect x="1.5" y="2.5" width="13" height="11" rx="1
 function ice(up){return '<svg viewBox="0 0 16 16"><rect x="2" y="3.5" width="12" height="8" rx="1.2" fill="'+(up?'#2f9e44':'#9aa0ab')+'"/><rect x="4" y="5.3" width="8" height="3.2" fill="#1f2a22"/><path d="M5 11.5v2.5M8 11.5v2.5M11 11.5v2.5" stroke="'+(up?'#d9a400':'#b7bcc6')+'" stroke-width="1.4"/></svg>'}
 function ico(x){return x.type==='VLAN'?ICV:x.type==='Bridge'?ICB:x.type==='Ethernet'?ice(x.up):ICX}
 // bridge members sit under their master, like WinBox
-function group(L){var names={};L.forEach(function(x){names[x.n]=1});var o=[];
-  L.filter(function(x){return !x.master||!names[x.master]}).forEach(function(x){o.push(x);L.filter(function(c){return c.master===x.n}).forEach(function(c){o.push(c)})});return o}
+function vid(n){var m=/\.(\d+)$/.exec(n);return m?+m[1]:-1}
+function group(L){var names={},o=[],seen={};L.forEach(function(x){names[x.n]=1});
+  function kids(p){return L.filter(function(c){return c.master===p}).sort(function(a,b){var d=vid(a.n)-vid(b.n);return d||window.bvSortCmp(a.n,b.n)})}
+  function walk(x,d){if(seen[x.n])return;seen[x.n]=1;x.depth=d;o.push(x);kids(x.n).forEach(function(c){walk(c,d+1)})}
+  L.filter(function(x){return !x.master||!names[x.master]}).forEach(function(x){walk(x,0)});
+  L.forEach(function(x){if(!seen[x.n])walk(x,0)});return o}
 function state(x){return x.up?'running':x.dis?'disabled':'no carrier'}
 function draw(){
   var k=q.value.toLowerCase(),m=f.value,n=0,h='';
@@ -22,7 +26,7 @@ function draw(){
     if(m==='up'&&!x.up||m==='down'&&x.up)return;
     if(k&&(x.n+' '+x.type+' '+x.mac+' '+x.drv+' '+x.v4.join(' ')+' '+x.v6.join(' ')).toLowerCase().indexOf(k)<0)return;
     n++;var r=x.r||{tx:0,rx:0,txp:0,rxp:0};
-    h+='<tr data-n="'+esc(x.n)+'" class="'+(x.up?'':'dis')+(x.n===sel?' sel':'')+'"><td class="fl">'+(x.dis?'X':x.up?'R':'')+'</td><td class="nm'+(x.master?' sub':'')+'"><span class="ei">'+ico(x)+'</span>'+esc(x.n)+'</td><td>'+esc(x.type)+'</td><td class="n">'+x.mtu+'</td><td class="n r">'+bps(r.tx)+'</td><td class="n r">'+bps(r.rx)+'</td><td class="n">'+pps(r.txp)+'</td><td class="n">'+pps(r.rxp)+'</td><td>'+esc(x.drv)+'</td><td class="n">'+spd(x.spd)+'</td><td class="mac">'+esc(x.mac)+'</td></tr>';
+    h+='<tr data-n="'+esc(x.n)+'" class="'+(x.up?'':'dis')+(x.n===sel?' sel':'')+'"><td class="fl">'+(x.dis?'X':x.up?'R':'')+'</td><td class="nm'+(x.depth?' sub':'')+(x.depth>1?' d'+Math.min(x.depth,6):'')+'"><span class="ei">'+ico(x)+'</span>'+esc(x.n)+'</td><td>'+esc(x.type)+'</td><td class="n">'+x.mtu+'</td><td class="n r">'+bps(r.tx)+'</td><td class="n r">'+bps(r.rx)+'</td><td class="n">'+pps(r.txp)+'</td><td class="n">'+pps(r.rxp)+'</td><td>'+esc(x.drv)+'</td><td class="n">'+spd(x.spd)+'</td><td class="mac">'+esc(x.mac)+'</td></tr>';
   });
   tb.innerHTML=h;cn.textContent=n+' items';
 }

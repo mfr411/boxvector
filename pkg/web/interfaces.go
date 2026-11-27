@@ -101,6 +101,11 @@ func listIfaces() []ifaceInfo {
 		if l, err := os.Readlink(b + "/master"); err == nil {
 			master = filepath.Base(l)
 		}
+		if master == "" { // VLAN / QinQ / macvlan etc: parent is the lower device
+			if g, _ := filepath.Glob(b + "/lower_*"); len(g) == 1 {
+				master = strings.TrimPrefix(filepath.Base(g[0]), "lower_")
+			}
+		}
 		fi := ifaceInfo{Name: n.Name, Index: n.Index, Type: typ, MTU: n.MTU, MAC: strings.ToUpper(n.HardwareAddr.String()),
 			Driver: drv, Speed: spd, Master: master, Up: run, Dis: !adm, V4: []string{}, V6: []string{},
 			RxB: sysUint(b + "/statistics/rx_bytes"), TxB: sysUint(b + "/statistics/tx_bytes"),
