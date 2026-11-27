@@ -376,12 +376,11 @@ func patchScript(jobID string, mode Mode, pkgs []string, dry bool) (string, erro
 	default:
 		return "", errors.New("unknown mode")
 	}
-	b := `BK=/var/lib/boxvector/patch-backup/` + jobID + `
-`
 	s := pre
 	if !dry {
-		s += `$S mkdir -p "$BK" && $S tar czf "$BK/etc.tgz" /etc/bird /etc/boxvector 2>/dev/null
-` + b
+		s += `BK=/var/lib/boxvector/patch-backup/` + jobID + `
+$S mkdir -p "$BK" && $S tar czf "$BK/etc.tgz" /etc/bird /etc/boxvector 2>/dev/null
+`
 		// repack currently-installed critical packages so rollback does not depend on old versions staying in the repo
 		s += `if ! command -v dpkg-repack >/dev/null 2>&1; then $S apt-get install -y -qq dpkg-repack >/dev/null 2>&1; fi
 if command -v dpkg-repack >/dev/null 2>&1; then

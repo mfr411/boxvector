@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -63,15 +64,16 @@ func (r *SSHRunner) Run(ctx context.Context, h Host, script string) (string, err
 		return "", err
 	}
 	defer s.Close()
-	var out bytes.Buffer
-	s.Stdout, s.Stderr = &out, &out
+	out := &syncBuf{}
+	s.Stdout, s.Stderr = out, out
 	s.Stdin = bytes.NewBufferString(script)
 	done := make(chan error, 1)
 	go func() { done <- s.Run("bash -s") }()
 	select {
 	case err := <-done:
 		// a non-zero exit is reported through the script's own markers
-		if _, ok := err.(*ssh.ExitError); ok {
+		if ee, ok := err.(*ssh.ExitError); ok {
+			out.WriteString(fmt.Sprintf("\nSSH_EXIT=%d\n", ee.ExitStatus()))
 			err = nil
 		}
 		return out.String(), err
@@ -79,4 +81,25 @@ func (r *SSHRunner) Run(ctx context.Context, h Host, script string) (string, err
 		_ = cl.Close()
 		return out.String(), ctx.Err()
 	}
+}
+
+// syncBuf is a mutex-guarded buffer: the ssh package copies stdout and stderr
+// from two goroutines, and a plain bytes.Buffer loses output under that race.
+type syncBuf struct {
+	mu sync.Mutex
+	b  bytes.Buffer
+}
+
+func (s *syncBuf) Write(p []byte) (int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.Write(p)
+}
+
+func (s *syncBuf) WriteString(x string) (int, error) { return s.Write([]byte(x)) }
+
+func (s *syncBuf) String() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.b.String()
 }
