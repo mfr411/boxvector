@@ -351,3 +351,11 @@ th.srt.sa:after,th.srt.sd:after{content:"";display:inline-block;margin-left:6px;
 th.srt.sa:after{border-bottom:5px solid #5a63b8;border-top:0}th.srt.sd:after{border-top:5px solid #5a63b8;border-bottom:0}
 /* status bar: fields sit on the right */
 .st .g{margin-left:auto;width:auto;justify-content:flex-end}
+/* terminal */
+.tmw{height:calc(100vh - 262px);min-height:260px;background:#10131a;border:1px solid #2a2f3d;border-radius:4px;padding:6px 4px 4px 8px;overflow:hidden}
+#term{height:100%}#term .xterm-viewport{background-color:#10131a!important}
+.tmw{height:calc(100vh - 292px);margin-bottom:0}
+#term .xterm-viewport{scrollbar-width:thin;scrollbar-color:#3a4052 #10131a}
+#term .xterm-viewport::-webkit-scrollbar{width:8px}#term .xterm-viewport::-webkit-scrollbar-track{background:#10131a}
+#term .xterm-viewport::-webkit-scrollbar-thumb{background:#3a4052;border-radius:4px}
+#tsz{margin-left:16px;color:#888}

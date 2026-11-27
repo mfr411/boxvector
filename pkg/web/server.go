@@ -26,15 +26,17 @@ var assets embed.FS
 
 // Options configures the web server.
 type Options struct {
-	Listen     string
-	ConfigFile string
-	AuthFile   string
-	StateDir   string
-	TLSCert    string
-	TLSKey     string
-	TrustProxy bool
-	Version    string
-	SystemAuth bool // sign in with the server's own accounts (root / sudo group)
+	Listen       string
+	ConfigFile   string
+	AuthFile     string
+	StateDir     string
+	TLSCert      string
+	TLSKey       string
+	TrustProxy   bool
+	Version      string
+	TermSocket   string // root terminal helper socket
+	TermInsecure bool   // allow the terminal over plain HTTP
+	SystemAuth   bool   // sign in with the server's own accounts (root / sudo group)
 }
 
 type server struct {
@@ -120,7 +122,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "config", "review", "routes", "logs", "interfaces"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "config", "review", "routes", "logs", "interfaces", "terminal"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -146,6 +148,12 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /config/restore", s.authed(s.restorePost))
 	mux.HandleFunc("GET /routes", s.authed(s.routesPage))
 	mux.HandleFunc("GET /logs", s.authed(s.logsPage))
+	mux.HandleFunc("GET /terminal", s.authed(s.termPage))
+	mux.HandleFunc("POST /term/new", s.authed(s.termNew))
+	mux.HandleFunc("GET /term/out", s.authed(s.termOut))
+	mux.HandleFunc("POST /term/in", s.authed(s.termForward("in", "id", "d")))
+	mux.HandleFunc("POST /term/resize", s.authed(s.termForward("resize", "id", "cols", "rows")))
+	mux.HandleFunc("POST /term/close", s.authed(s.termForward("close", "id")))
 
 	srv := &http.Server{
 		Addr:              opt.Listen,
@@ -166,7 +174,11 @@ func Serve(opt Options) error {
 func secure(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hd := w.Header()
-		hd.Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+		sty := "'self'"
+		if r.URL.Path == "/terminal" {
+			sty = "'self' 'unsafe-inline'" // xterm.js injects its renderer styles
+		}
+		hd.Set("Content-Security-Policy", "default-src 'none'; style-src "+sty+"; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 		hd.Set("X-Content-Type-Options", "nosniff")
 		hd.Set("X-Frame-Options", "DENY")
 		hd.Set("Referrer-Policy", "no-referrer")

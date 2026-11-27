@@ -1,0 +1,9 @@
+{{define "body"}}{{with .Data}}
+{{if .Msg}}<p class="err">{{.Msg}}</p>{{else}}
+<link rel="stylesheet" href="/static/xterm.css">
+<div class="tools"><span class="mono cfile">root@{{$.Router.Hostname}}</span><span id="tstat" class="dirty" hidden></span>
+<span class="sumc"><button type="button" id="tnew">New session</button><button type="button" id="tclose" disabled>Close</button></span></div>
+<div class="tmw"><div id="term" data-csrf="{{$.CSRF}}"></div></div>
+<div class="ds2 cst"><span>Root shell on this server. Every open and close is written to Logs.</span><span id="tsz"></span></div>
+<script src="/static/xterm.js" defer></script><script src="/static/xterm-fit.js" defer></script><script src="/static/terminal.js" defer></script>
+{{end}}{{end}}{{end}}

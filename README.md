@@ -393,3 +393,12 @@ boxvector is powered by [nexcolo](https://www.nexcolo.com/).
 
 MIT, see [LICENSE](LICENSE). The original Pathvector copyright notice is kept
 as required by the license.
+
+## Terminal
+
+The web UI has a root terminal (sidebar, Terminal). A small helper (`boxvector-term.service`, runs as root) opens login shells on a PTY; the sandboxed web service authenticates users and proxies to it.
+
+- Only `root` and members of `sudo`/`wheel`/`admin` can open it; every open/close is written to Logs.
+- It only works over HTTPS (`--tls-cert/--tls-key`, or a reverse proxy with `--trust-proxy`) or from localhost (for example through an SSH tunnel). `--terminal-insecure` overrides this, which is not recommended.
+- Idle sessions are closed after 15 minutes, at most 4 at once.
+- Disable it with `systemctl disable --now boxvector-term`.

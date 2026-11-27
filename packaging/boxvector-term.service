@@ -1,0 +1,19 @@
+[Unit]
+Description=boxvector root terminal helper
+Documentation=https://github.com/mfr411/boxvector
+After=network.target
+PartOf=boxvector-web.service
+
+[Service]
+Type=simple
+# Runs as root on purpose: it only opens login shells on a PTY for the web UI, which
+# authenticates users (root/sudo only), requires HTTPS or localhost and logs every session.
+ExecStart=/usr/bin/boxvector term-helper --socket /run/boxvector-term.sock
+Restart=on-failure
+RestartSec=3
+RuntimeDirectory=boxvector-term
+RuntimeDirectoryMode=0755
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
