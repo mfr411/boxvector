@@ -1,7 +1,7 @@
 {{template "head"}}{{template "nav" .Nav}}
 {{if .New}}<div class="card"><h2>New enroll token (shown once)</h2><pre>curl -fsSL https://monitor.boxvector.co/install.sh | sudo ENROLL_TOKEN={{.New}} sh</pre></div>{{end}}
 <form method="post" class="card"><h2>Create enroll token</h2><div class="bar"><input type="hidden" name="do" value="new"><input type="text" name="label" placeholder="Label (e.g. customer or site)" maxlength="60" style="width:260px"><button>Create</button><span class="s">A token enrolls any number of devices until revoked. Each device then gets its own secret.</span></div></form>
-<div class="card"><h2>Tokens</h2><table><tr><th>ID</th><th>Label</th><th>Created</th><th>Enrolled</th><th></th></tr>
+<div class="card"><h2>Tokens</h2><div class="scroll"><table><tr><th>ID</th><th>Label</th><th>Created</th><th>Enrolled</th><th></th></tr>
 {{range .Tokens}}<tr><td class="mono">{{.ID}}</td><td>{{.Label}}</td><td>{{ts .Created}}</td><td>{{.Uses}}</td><td>{{if .Revoked}}<span class="tag">revoked</span>{{else}}<form method="post" style="margin:0"><input type="hidden" name="do" value="revoke"><input type="hidden" name="id" value="{{.ID}}"><button>Revoke</button></form>{{end}}</td></tr>
-{{else}}<tr><td colspan="5" class="s">No tokens.</td></tr>{{end}}</table></div>
+{{else}}<tr><td colspan="5" class="s">No tokens.</td></tr>{{end}}</table></div></div>
 {{template "foot"}}

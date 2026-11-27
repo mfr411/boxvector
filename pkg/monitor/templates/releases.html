@@ -1,7 +1,7 @@
 {{template "head"}}{{template "nav" .Nav}}
 {{if .Msg}}<div class="msg">{{.Msg}}</div>{{end}}
 <form method="post" enctype="multipart/form-data" class="card"><h2>Upload release</h2><div class="bar"><input type="file" name="deb" accept=".deb" required><button>Upload</button><span class="s">boxvector_&lt;version&gt;_&lt;amd64|arm64&gt;.deb, max 120 MB. Agents verify the SHA-256 before installing.</span></div></form>
-<div class="card"><h2>Releases</h2><table><tr><th>Version</th><th>Arch</th><th>Size</th><th>SHA-256</th><th>Uploaded</th><th></th></tr>
+<div class="card"><h2>Releases</h2><div class="scroll"><table><tr><th>Version</th><th>Arch</th><th>Size</th><th>SHA-256</th><th>Uploaded</th><th></th></tr>
 {{range .Rel}}<tr><td class="mono">{{.Version}}</td><td>{{.Arch}}</td><td>{{mb .Size}}</td><td class="mono">{{short .SHA256}}…</td><td>{{ts .Uploaded}}</td><td><form method="post" action="/act" style="margin:0"><input type="hidden" name="do" value="delrel"><input type="hidden" name="version" value="{{.Version}}"><input type="hidden" name="arch" value="{{.Arch}}"><button onclick="return confirm('Delete this release?')">Delete</button></form></td></tr>
-{{else}}<tr><td colspan="6" class="s">No releases uploaded.</td></tr>{{end}}</table></div>
+{{else}}<tr><td colspan="6" class="s">No releases uploaded.</td></tr>{{end}}</table></div></div>
 {{template "foot"}}
