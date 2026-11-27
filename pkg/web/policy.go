@@ -333,8 +333,13 @@ func compileRule(line string, dir polDir) (string, error) {
 		if err != nil || e2 != nil || n < 1 || n > 10 {
 			return "", fmt.Errorf("prepend needs a count between 1 and 10")
 		}
-		act = strings.Repeat("bgp_path.prepend(ASN); ", n)
-		act = strings.TrimSpace(act)
+		// Import: repeat the neighbor's own AS so enforce_first_as() (which runs after this block) still passes.
+		// Export: prepend our ASN.
+		unit := "bgp_path.prepend(ASN);"
+		if dir == polImport {
+			unit = "bgp_path.prepend(bgp_path.first);"
+		}
+		act = strings.TrimSpace(strings.Repeat(unit+" ", n))
 	case "add-community":
 		a, err := one()
 		x, y, ok := strings.Cut(a, ":")

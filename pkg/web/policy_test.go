@@ -16,7 +16,7 @@ func TestCompileRule(t *testing.T) {
 		{"suppress community 65000:666", "(65000,666) ~ bgp_community", polExport},
 		{"med 50 when community 65000:100", "then { bgp_med = 50; }", polImport},
 		{"prepend 2 when ipv6", "bgp_path.prepend(ASN); bgp_path.prepend(ASN);", polExport},
-		{"prepend 1 when origin 65001", "bgp_path.prepend(ASN);", polImport},
+		{"prepend 1 when origin 65001", "bgp_path.prepend(bgp_path.first);", polImport},
 		{"only origin 65001 and prefix 192.0.2.0/24", " && ", polImport},
 		{"reject first-as 64512-65534", "64512..65534", polImport},
 		{"only path 65001 * 65010", "[= 65001 * 65010 =]", polImport},
