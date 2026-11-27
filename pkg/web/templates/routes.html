@@ -1,5 +1,11 @@
 {{define "body"}}{{with .Data}}
-<form class="bar" method="get" action="/routes"><h2>Routes</h2><input name="q" value="{{.Q}}" placeholder="IP, prefix or AS" aria-label="Query"><button>Search</button></form>
-{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<div class="tools"><a class="btn tabb{{if eq .View "bird"}} on{{end}}" href="/routes">BIRD (master4/6)</a><a class="btn tabb{{if eq .View "kernel"}} on{{end}}" href="/routes?v=kernel">Kernel (ip route)</a>
+<form class="rq" method="get" action="/routes"><input name="q" class="find" value="{{.Q}}" placeholder="IP, prefix or AS" aria-label="Query" autocomplete="off"><button>Search</button></form></div>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}{{if .TblErr}}<p class="err">{{.TblErr}}</p>{{end}}
 {{if .Cmd}}<p class="s mono">{{.Cmd}}</p><pre class="out">{{.Out}}</pre>{{end}}
+<div class="tw"><table class="ift rt{{if eq .View "kernel"}} rk{{end}}"><colgroup><col><col><col><col><col>{{if ne .View "kernel"}}<col><col>{{end}}</colgroup><thead><tr><th>Dst. address</th><th>Type</th>{{if ne .View "kernel"}}<th>Source</th>{{end}}<th>Gateway</th><th>Interface</th><th class="n">{{if eq .View "kernel"}}Metric{{else}}Pref.{{end}}</th>{{if ne .View "kernel"}}<th>Since</th>{{end}}</tr></thead><tbody>
+{{range .Rows}}<tr><td class="nm mono">{{.Prefix}}</td><td>{{.Type}}</td>{{if ne $.Data.View "kernel"}}<td>{{.Source}}</td>{{end}}<td class="mono">{{.Via}}</td><td>{{.Dev}}</td><td class="n">{{.Pref}}</td>{{if ne $.Data.View "kernel"}}<td class="s">{{.Since}}</td>{{end}}</tr>
+{{else}}<tr><td colspan="7" class="s">No routes.</td></tr>{{end}}
+</tbody></table></div>
+<div class="ds2"><span>{{.Total}} items{{if .More}} ({{.More}} not shown){{end}}</span></div>
 {{end}}{{end}}

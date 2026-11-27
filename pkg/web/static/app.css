@@ -216,3 +216,17 @@ td,th{white-space:nowrap}td.wrap,td .wrap{white-space:normal}
 .pt .fam{margin-left:7px;color:#6b7280;font-size:11px}
 .tools{gap:8px}.tools .add{margin-right:0}
 .pt td.mono{line-height:1;white-space:nowrap}
+
+/* routes */
+.rt col:nth-child(1){width:190px}
+.rt col:nth-child(2){width:100px}
+.rt col:nth-child(3){width:110px}
+.rt col:nth-child(4){width:170px}
+.rt col:nth-child(5){width:110px}
+.rt col:nth-child(6){width:70px}
+.rt col:nth-child(7){width:170px}
+.rt{width:100%;min-width:920px}.rt td{height:25px;padding-top:0;padding-bottom:0;vertical-align:middle}
+.rt td.mono{background:none;border:0;font:12px Consolas,"DejaVu Sans Mono",monospace;line-height:1;white-space:nowrap}
+.tabb{text-decoration:none}.tabb.on{background:#d9e8fb;border-color:#9db6e4;font-weight:600}
+.rq{margin-left:auto;display:flex;gap:8px;align-items:center}
+.rt.rk{min-width:0}.rt.rk col:nth-child(1){width:auto}.rt.rk col:nth-child(2){width:130px}.rt.rk col:nth-child(3){width:200px}.rt.rk col:nth-child(4){width:130px}.rt.rk col:nth-child(5){width:90px}

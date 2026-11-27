@@ -607,6 +607,34 @@ func (s *server) routesPage(w http.ResponseWriter, r *http.Request, sess *sessio
 			}
 		}
 	}
+	view := r.URL.Query().Get("v")
+	if view != "kernel" {
+		view = "bird"
+	}
+	d["View"] = view
+	var all []routeRow
+	var tot int
+	if view == "kernel" {
+		rows, n, err := kernelRoutes()
+		if err != nil {
+			d["TblErr"] = "ip route: " + err.Error()
+		}
+		all, tot = rows, n
+	} else {
+		for _, tb := range []string{"master4", "master6"} {
+			rows, n, err := birdRoutes(s.router().Socket, tb)
+			if err != nil {
+				d["TblErr"] = "BIRD: " + err.Error()
+				break
+			}
+			all = append(all, rows...)
+			tot += n
+		}
+	}
+	d["Rows"], d["Total"] = all, tot
+	if tot > len(all) {
+		d["More"] = tot - len(all)
+	}
 	s.render(w, "routes", ctxPage{Title: "Routes", Nav: "routes", User: sess.user, CSRF: sess.csrf, Data: d})
 }
 
