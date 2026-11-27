@@ -30,7 +30,8 @@ type Server struct {
 	authFile string
 	tpl      *template.Template
 	mu       sync.Mutex
-	sess     map[string]time.Time
+	sess     map[string]sess
+	saved    time.Time
 	fails    map[string][]time.Time
 	now      func() time.Time
 }
@@ -70,7 +71,43 @@ func NewServer(dir, authFile string) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Server{st: st, dir: dir, authFile: authFile, tpl: t, sess: map[string]time.Time{}, fails: map[string][]time.Time{}, now: time.Now}, nil
+	srv := &Server{st: st, dir: dir, authFile: authFile, tpl: t, sess: map[string]sess{}, fails: map[string][]time.Time{}, now: time.Now}
+	srv.loadSess()
+	return srv, nil
+}
+
+const sessTTL = 30 * 24 * time.Hour
+
+type sess struct {
+	User string    `json:"user"`
+	Exp  time.Time `json:"exp"`
+}
+
+func (s *Server) sessFile() string { return filepath.Join(s.dir, "sessions.json") }
+
+func (s *Server) loadSess() {
+	b, err := os.ReadFile(s.sessFile())
+	if err != nil {
+		return
+	}
+	m := map[string]sess{}
+	if json.Unmarshal(b, &m) == nil {
+		for k, v := range m {
+			if v.Exp.After(s.now()) {
+				s.sess[k] = v
+			}
+		}
+	}
+}
+
+// saveSess writes the (hashed) session table; caller holds s.mu.
+func (s *Server) saveSess() {
+	b, _ := json.Marshal(s.sess)
+	tmp := s.sessFile() + ".tmp"
+	if os.WriteFile(tmp, b, 0o600) == nil {
+		_ = os.Rename(tmp, s.sessFile())
+	}
+	s.saved = s.now()
 }
 
 func (s *Server) Store() *Store { return s.st }
@@ -97,6 +134,7 @@ func (s *Server) Handler() http.Handler {
 	m.HandleFunc("/releases", s.admin(s.releases))
 	m.HandleFunc("/enroll", s.admin(s.enrollPage))
 	m.HandleFunc("/act", s.admin(s.act))
+	m.HandleFunc("/account", s.admin(s.account))
 	return secure(m)
 }
 
@@ -255,30 +293,37 @@ func rnd() string {
 	return hex.EncodeToString(b)
 }
 
-func (s *Server) session(r *http.Request) (string, bool) {
+func (s *Server) session(r *http.Request) (string, string, bool) {
 	c, err := r.Cookie("bvm")
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
 	h := fmt.Sprintf("%x", sha256.Sum256([]byte(c.Value)))
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	exp, ok := s.sess[h]
-	if !ok || s.now().After(exp) {
-		delete(s.sess, h)
-		return "", false
+	v, ok := s.sess[h]
+	if !ok || s.now().After(v.Exp) {
+		if ok {
+			delete(s.sess, h)
+			s.saveSess()
+		}
+		return "", "", false
 	}
-	s.sess[h] = s.now().Add(8 * time.Hour)
-	return h, true
+	v.Exp = s.now().Add(sessTTL)
+	s.sess[h] = v
+	if s.now().Sub(s.saved) > time.Hour {
+		s.saveSess()
+	}
+	return h, v.User, true
 }
 
 func (s *Server) admin(h http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/" && r.URL.Path != "/device" && r.URL.Path != "/releases" && r.URL.Path != "/enroll" && r.URL.Path != "/act" {
+		if r.URL.Path != "/" && r.URL.Path != "/device" && r.URL.Path != "/releases" && r.URL.Path != "/enroll" && r.URL.Path != "/account" && r.URL.Path != "/act" {
 			http.NotFound(w, r)
 			return
 		}
-		if _, ok := s.session(r); !ok {
+		if _, _, ok := s.session(r); !ok {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
@@ -307,9 +352,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 			if good {
 				tok := rnd()
 				s.mu.Lock()
-				s.sess[fmt.Sprintf("%x", sha256.Sum256([]byte(tok)))] = s.now().Add(8 * time.Hour)
+				s.sess[fmt.Sprintf("%x", sha256.Sum256([]byte(tok)))] = sess{User: u, Exp: s.now().Add(sessTTL)}
+				s.saveSess()
 				s.mu.Unlock()
-				http.SetCookie(w, &http.Cookie{Name: "bvm", Value: tok, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, MaxAge: 8 * 3600})
+				http.SetCookie(w, &http.Cookie{Name: "bvm", Value: tok, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteStrictMode, MaxAge: int(sessTTL.Seconds())})
 				http.Redirect(w, r, "/", http.StatusSeeOther)
 				return
 			}
@@ -321,9 +367,10 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
-	if h, ok := s.session(r); ok {
+	if h, _, ok := s.session(r); ok {
 		s.mu.Lock()
 		delete(s.sess, h)
+		s.saveSess()
 		s.mu.Unlock()
 	}
 	http.SetCookie(w, &http.Cookie{Name: "bvm", Path: "/", MaxAge: -1, Secure: true, HttpOnly: true})
@@ -498,4 +545,44 @@ func (s *Server) act(w http.ResponseWriter, r *http.Request) {
 		sep = "&"
 	}
 	http.Redirect(w, r, back+sep+"m="+template.URLQueryEscaper(msg), http.StatusSeeOther)
+}
+
+// account lets the signed-in admin change their own password. Other sessions of that user are signed out.
+func (s *Server) account(w http.ResponseWriter, r *http.Request) {
+	cur, user, _ := s.session(r)
+	data := map[string]any{"Nav": "account", "User": user, "Msg": "", "Err": ""}
+	if r.Method == http.MethodPost {
+		old, n1, n2 := r.FormValue("old"), r.FormValue("new"), r.FormValue("again")
+		h := s.users()[user]
+		switch {
+		case s.throttle("pw:"+user, 5):
+			data["Err"] = "Too many attempts. Try again later."
+		case h == "" || bcrypt.CompareHashAndPassword([]byte(h), []byte(old)) != nil:
+			s.fail("pw:" + user)
+			data["Err"] = "Current password is wrong."
+		case len(n1) < 10:
+			data["Err"] = "New password must be at least 10 characters."
+		case len(n1) > 72:
+			data["Err"] = "New password must be at most 72 characters."
+		case n1 != n2:
+			data["Err"] = "The two new passwords do not match."
+		case n1 == old:
+			data["Err"] = "New password must differ from the current one."
+		default:
+			if err := SetPassword(s.authFile, user, n1); err != nil {
+				data["Err"] = "Could not save: " + err.Error()
+			} else {
+				s.mu.Lock()
+				for k, v := range s.sess {
+					if v.User == user && k != cur {
+						delete(s.sess, k)
+					}
+				}
+				s.saveSess()
+				s.mu.Unlock()
+				data["Msg"] = "Password changed. Other sessions were signed out."
+			}
+		}
+	}
+	s.render(w, "account.html", data)
 }

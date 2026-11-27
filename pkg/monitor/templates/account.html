@@ -1,0 +1,8 @@
+{{template "head"}}{{template "nav" .Nav}}
+{{if .Msg}}<div class="msg">{{.Msg}}</div>{{end}}
+<form method="post" class="card" style="max-width:420px"><h2>Change password · {{.User}}</h2><div class="in">
+<label class="s">Current password</label><br><input type="password" name="old" autocomplete="current-password" required style="width:100%;margin:4px 0 10px">
+<label class="s">New password (min. 10 characters)</label><br><input type="password" name="new" autocomplete="new-password" minlength="10" maxlength="72" required style="width:100%;margin:4px 0 10px">
+<label class="s">Repeat new password</label><br><input type="password" name="again" autocomplete="new-password" minlength="10" maxlength="72" required style="width:100%;margin:4px 0 10px">
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}<button>Change password</button></div></form>
+{{template "foot"}}

@@ -172,3 +172,51 @@ func TestHTTPAuth(t *testing.T) {
 		t.Fatalf("unknown path %d", w.Code)
 	}
 }
+
+func TestSessionPersistAndPasswordChange(t *testing.T) {
+	dir := t.TempDir()
+	af := filepath.Join(dir, "users")
+	_ = SetPassword(af, "admin", "correct-horse-1")
+	s, _ := NewServer(dir, af)
+	post := func(h http.Handler, p, body, cookie string) *httptest.ResponseRecorder {
+		r := httptest.NewRequest("POST", p, strings.NewReader(body))
+		r.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if cookie != "" {
+			r.Header.Set("Cookie", cookie)
+		}
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		return w
+	}
+	login := func(h http.Handler, pw string) string {
+		w := post(h, "/login", "user=admin&password="+pw, "")
+		if len(w.Result().Cookies()) == 0 {
+			return ""
+		}
+		return "bvm=" + w.Result().Cookies()[0].Value
+	}
+	c1, c2 := login(s.Handler(), "correct-horse-1"), login(s.Handler(), "correct-horse-1")
+	// a restart must not log anyone out
+	s2, _ := NewServer(dir, af)
+	if w := post(s2.Handler(), "/account", "", c1); w.Code != 200 {
+		t.Fatalf("session lost after restart: %d", w.Code)
+	}
+	h := s2.Handler()
+	for _, bad := range []string{"old=wrong&new=another-long-pass&again=another-long-pass", "old=correct-horse-1&new=short&again=short", "old=correct-horse-1&new=another-long-pass&again=different-long-pass"} {
+		if w := post(h, "/account", bad, c1); strings.Contains(w.Body.String(), "Password changed") {
+			t.Fatalf("accepted %q", bad)
+		}
+	}
+	if w := post(h, "/account", "old=correct-horse-1&new=another-long-pass&again=another-long-pass", c1); !strings.Contains(w.Body.String(), "Password changed") {
+		t.Fatal("valid change refused")
+	}
+	if w := post(h, "/account", "", c2); w.Code != http.StatusSeeOther {
+		t.Fatal("other session survived a password change")
+	}
+	if w := post(h, "/account", "", c1); w.Code != 200 {
+		t.Fatal("current session was dropped")
+	}
+	if login(h, "correct-horse-1") != "" || login(h, "another-long-pass") == "" {
+		t.Fatal("password not switched")
+	}
+}

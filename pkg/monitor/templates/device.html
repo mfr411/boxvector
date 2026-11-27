@@ -10,5 +10,5 @@
 <form method="post" action="/act" class="card"><h2>Actions</h2><input type="hidden" name="id" value="{{.D.ID}}"><input type="hidden" name="back" value="/device?id={{.D.ID}}">
 <div class="bar"><select name="version">{{range .Rel}}<option value="{{.Version}}">{{.Version}} · {{.Arch}}</option>{{end}}</select><button name="do" value="approve">Approve patch</button><button name="do" value="cancel">Cancel queued</button></div>
 <div class="bar"><input type="text" name="note" value="{{.D.Note}}" placeholder="Note" maxlength="200" style="width:300px"><button name="do" value="note">Save note</button><span style="flex:1"></span><button name="do" value="delete" onclick="return confirm('Remove this device from the monitor? The agent will stop authenticating.')">Remove device</button></div></form>
-<div class="card"><h2>History</h2><div class="scroll"><table>{{range .Events}}<tr><td class="s">{{ts .At}}</td><td>{{.Msg}}</td></tr>{{else}}<tr><td class="s">Nothing yet.</td></tr>{{end}}</table></div></div>
+<div class="card"><h2>History</h2><div class="scroll"><table class="ev">{{range .Events}}<tr><td class="s">{{ts .At}}</td><td>{{.Msg}}</td></tr>{{else}}<tr><td class="s">Nothing yet.</td></tr>{{end}}</table></div></div>
 {{template "foot"}}
