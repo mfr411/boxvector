@@ -477,7 +477,7 @@ func (s *server) peerNewPage(w http.ResponseWriter, r *http.Request, sess *sessi
 
 func formFromRequest(r *http.Request) map[string]string {
 	f := map[string]string{}
-	for _, k := range append([]string{"name", "asn", "neighbors", "description", "template", "limit4", "limit6", "asset"}, ruleKeys()...) {
+	for _, k := range append([]string{"name", "asn", "neighbors", "description", "template", "limit4", "limit6", "asset", "imp_rules", "imp_raw", "exp_rules", "exp_raw"}, ruleKeys()...) {
 		f[k] = strings.TrimSpace(r.PostFormValue(k))
 	}
 	return f
@@ -556,6 +556,10 @@ func formFromPeer(name string, n *yaml.Node) map[string]string {
 			f["limit4"] = v.Value
 		case "import-limit6":
 			f["limit6"] = v.Value
+		case "pre-import-filter":
+			f["imp_rules"], f["imp_raw"] = parsePolicyValue(v.Value)
+		case "pre-export":
+			f["exp_rules"], f["exp_raw"] = parsePolicyValue(v.Value)
 		case "neighbors":
 			var l []string
 			for _, c := range v.Content {
@@ -721,6 +725,19 @@ func buildPeer(f map[string]string) (*yaml.Node, string) {
 			return nil, "Invalid value for " + rd.Label + "."
 		}
 	}
+	for _, pk := range []struct {
+		key, rules, raw string
+		dir             polDir
+		label           string
+	}{{"pre-import-filter", "imp_rules", "imp_raw", polImport, "Import policy"}, {"pre-export", "exp_rules", "exp_raw", polExport, "Export policy"}} {
+		v, msg := buildPolicyValue(f[pk.rules], f[pk.raw], pk.dir)
+		if msg != "" {
+			return nil, pk.label + ": " + msg
+		}
+		if v != "" {
+			add(pk.key, &yaml.Node{Kind: yaml.ScalarNode, Value: v, Tag: "!!str", Style: yaml.LiteralStyle})
+		}
+	}
 	nl := &yaml.Node{Kind: yaml.SequenceNode}
 	for _, n := range neigh {
 		nl.Content = append(nl.Content, scalar(n, "!!str"))
@@ -731,7 +748,7 @@ func buildPeer(f map[string]string) (*yaml.Node, string) {
 
 // formKeys are the peer keys the form manages; everything else in a peer is left untouched on edit.
 func formKeys() map[string]bool {
-	m := map[string]bool{"template": true, "asn": true, "description": true, "as-set": true, "import-limit4": true, "import-limit6": true, "neighbors": true}
+	m := map[string]bool{"template": true, "asn": true, "description": true, "as-set": true, "import-limit4": true, "import-limit6": true, "neighbors": true, "pre-import-filter": true, "pre-export": true}
 	for _, r := range peerRules {
 		m[r.Key] = true
 	}
