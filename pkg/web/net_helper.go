@@ -304,6 +304,7 @@ func RunNetHelper(sock string) error {
 	mux.HandleFunc("POST /iface", im.handle)
 	vm := newVppMgr()
 	mux.HandleFunc("POST /vppif", vm.handle)
+	mux.HandleFunc("POST /traffic", newTrafficMgr().handle)
 	mux.HandleFunc("GET /vppif", vm.status)
 	mux.HandleFunc("GET /iface", im.status)
 	fmt.Fprintf(os.Stderr, "boxvector net helper on %s\n", sock)

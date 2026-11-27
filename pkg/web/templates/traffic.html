@@ -1,0 +1,5 @@
+{{define "body"}}<div class="tools"><label>Interface <select id="tdev">{{range .Data.Devs}}<option>{{.}}</option>{{end}}</select></label><span id="tinfo" class="ifc"></span></div>
+<div id="terr" class="ifc" hidden></div>
+<div class="tw"><table id="ttb" class="ift"><thead><tr><th>Source</th><th>Destination</th><th>Proto</th><th class="n">Port</th><th class="n">2 s</th><th class="n">10 s</th><th class="n">40 s</th><th class="n">Total</th></tr></thead><tbody></tbody></table></div>
+<div class="ifc">live from the interface (headers only, nothing is stored) · rates are bits per second, sorted by the 10 s average · stops sampling when this page is closed</div>
+<script src="/static/traffic.js" defer></script>{{end}}

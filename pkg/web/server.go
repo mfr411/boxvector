@@ -124,7 +124,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal", "kroute", "ifedit"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal", "kroute", "ifedit", "traffic"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -152,6 +152,8 @@ func Serve(opt Options) error {
 	mux.HandleFunc("GET /vpp", s.authed(s.vppPage))
 	mux.HandleFunc("GET /api/vpp", s.authed(s.vppAPI))
 	mux.HandleFunc("GET /api/vppsettings", s.authed(s.vppSettingsAPI))
+	mux.HandleFunc("GET /traffic", s.authed(s.trafficPage))
+	mux.HandleFunc("GET /api/traffic", s.authed(s.trafficAPI))
 	mux.HandleFunc("GET /api/peers", s.authed(s.peersAPI))
 	mux.HandleFunc("GET /api/status", s.authed(s.statusAPI))
 	mux.HandleFunc("GET /peers/new", s.authed(s.peerNewPage))
