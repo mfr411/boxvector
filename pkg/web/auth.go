@@ -33,6 +33,8 @@ type session struct {
 type auth struct {
 	file       string
 	trustProxy bool
+	system     bool   // verify against the server accounts (/etc/shadow)
+	shadow     string // shadow file path
 
 	mu       sync.Mutex
 	sessions map[string]*session
@@ -41,6 +43,12 @@ type auth struct {
 
 func newAuth(file string, trustProxy bool) *auth {
 	return &auth{file: file, trustProxy: trustProxy, sessions: map[string]*session{}, fails: map[string][]time.Time{}}
+}
+
+func newAuthOpt(o Options) *auth {
+	a := newAuth(o.AuthFile, o.TrustProxy)
+	a.system, a.shadow = o.SystemAuth, "/etc/shadow"
+	return a
 }
 
 func randHex(n int) string {
@@ -132,15 +140,21 @@ func (a *auth) blocked(ip string) bool {
 var dummyHash, _ = bcrypt.GenerateFromPassword([]byte("boxvector-dummy"), 12)
 
 func (a *auth) login(ip, user, password string) (*session, string, bool) {
-	users, err := a.users()
-	if err != nil {
-		return nil, "", false
+	var ok bool
+	if a.system {
+		ok = systemLogin(a.shadow, user, password)
+	} else {
+		users, err := a.users()
+		if err != nil {
+			return nil, "", false
+		}
+		h, found := users[user]
+		if !found {
+			_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
+		}
+		ok = found && bcrypt.CompareHashAndPassword([]byte(h), []byte(password)) == nil
 	}
-	h, ok := users[user]
 	if !ok {
-		_ = bcrypt.CompareHashAndPassword(dummyHash, []byte(password))
-	}
-	if !ok || bcrypt.CompareHashAndPassword([]byte(h), []byte(password)) != nil {
 		a.mu.Lock()
 		a.fails[ip] = append(a.fails[ip], time.Now())
 		a.mu.Unlock()

@@ -9,9 +9,9 @@ Type=simple
 User=boxvector
 Group=boxvector
 # bird group: write /etc/bird and talk to /run/bird/bird.ctl
-SupplementaryGroups=bird
+SupplementaryGroups=bird shadow
 ExecStart=/usr/bin/boxvector web -c /etc/boxvector/boxvector.yml \
-  --listen 127.0.0.1:8180 --state-dir /var/lib/boxvector/web \
+  --listen 0.0.0.0:6969 --state-dir /var/lib/boxvector/web \
   --auth-file /etc/boxvector/web.users
 Restart=on-failure
 RestartSec=5

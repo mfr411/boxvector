@@ -12,7 +12,7 @@ trap 'rm -rf "$pkg"' EXIT
 commit=$(git -C "$root" rev-parse --short HEAD 2>/dev/null || echo unknown)
 date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 mkdir -p "$pkg/usr/bin" "$out"
-(cd "$root" && CGO_ENABLED=0 GOOS=linux GOARCH=$arch go build -trimpath \
+(cd "$root" && CGO_ENABLED=1 GOOS=linux GOARCH=$arch go build -trimpath \
   -ldflags "-s -w -X main.version=$version -X main.commit=$commit -X main.date=$date" \
   -o "$pkg/usr/bin/boxvector" .)
 
@@ -28,7 +28,7 @@ Package: boxvector
 Version: $version
 Architecture: $arch
 Maintainer: PT Atharva Telematika Persada <noc@atharva.co.id>
-Depends: adduser, libc6 (>= 2.35)
+Depends: adduser, libc6 (>= 2.35), libcrypt1
 Recommends: bird3 | bird2, bgpq4
 Section: net
 Priority: optional
