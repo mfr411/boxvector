@@ -24,12 +24,10 @@ function hit(r,f,o,v){var s=String(r.dataset[f]||'').toLowerCase();v=v.toLowerCa
   return o==='c'?s.indexOf(v)>=0:o==='n'?s.indexOf(v)<0:o==='i'?s===v:s!==v}
 function run(){var cs=[].map.call(rows.children,function(d){return[d.querySelector('.ff').value,d.querySelector('.fo').value,d.querySelector('.fv').value.trim()]}).filter(function(c){return c[2]!==''}),n=0,t=0;
   [].forEach.call(tb.rows,function(r){if(!r.dataset.n)return;t++;var ok=cs.every(function(c){return hit(r,c[0],c[1],c[2])});r.dataset.fx=ok?'':'1';n++});
-  var ev=document.getElementById('filter');if(ev)ev.dispatchEvent(new Event('input'))}
+  document.dispatchEvent(new Event('bvrefilter'))}
 // peers.js hides rows by its own Find box; combine both by re-hiding rows we filtered out
-var q=$('filter');
-if(q)q.addEventListener('input',function(){setTimeout(function(){var n=0,t=0;[].forEach.call(tb.rows,function(r){if(!r.dataset.n)return;t++;if(r.dataset.fx==='1')r.style.display='none';if(r.style.display!=='none')n++});var c=$('pcount');if(c)c.textContent=n+' of '+t+' items'},0)});
 function show(on){bar.hidden=!on;fl.setAttribute('aria-pressed',on?'true':'false');fl.classList.toggle('on',on);if(on&&!rows.children.length)add()}
 fl.onclick=function(){show(bar.hidden)};
 $('fgo').onclick=run;
-$('fclr').onclick=function(){rows.innerHTML='';add();[].forEach.call(tb.rows,function(r){delete r.dataset.fx});if(q)q.dispatchEvent(new Event('input'))};
+$('fclr').onclick=function(){rows.innerHTML='';add();[].forEach.call(tb.rows,function(r){delete r.dataset.fx});document.dispatchEvent(new Event('bvrefilter'))};
 })();
