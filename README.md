@@ -7,8 +7,6 @@
 
 # boxvector
 
-**powered by [nexcolo](https://www.nexcolo.com/)**
-
 boxvector generates and manages BGP configuration for [BIRD](https://bird.nic.cz)
 2 and 3 from a single YAML file, with a web UI for day-to-day operations.
 Inspired by [Pathvector](https://github.com/natesales/pathvector), it focuses on
