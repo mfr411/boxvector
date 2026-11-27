@@ -39,6 +39,33 @@ distributions are **not supported**; the package refuses to install there.
 
 ## 1. Install
 
+### 1.0 Quick install (script)
+
+`install.sh` installs everything for you on Debian 12+/Ubuntu 22.04+. It is
+idempotent (safe to run again) and never overwrites an existing config.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mfr411/boxvector/main/install.sh -o install.sh
+sudo bash install.sh                 # interactive menu
+sudo bash install.sh --mode all      # boxvector + BIRD + VPP (linux-cp) + web UI
+sudo bash install.sh --mode core     # boxvector + BIRD only
+```
+
+| Option | Meaning |
+|---|---|
+| `--mode all\|core\|custom` | `all` = boxvector, BIRD, bgpq4, VPP + linux-cp, web UI enabled with an admin user. `core` = boxvector, BIRD, bgpq4 only. `custom` = choose with `--vpp/--no-vpp`, `--web/--no-web` |
+| `--bird 2\|3\|keep` | BIRD major version (default 2; 3 adds the CZ.NIC repository) |
+| `--vpp-nic 0000:03:00.0` | add a DPDK NIC to VPP. Refused while the NIC is still a kernel interface, so a remote session is not cut |
+| `--web-user NAME` | web UI admin name (default `admin`). Password is random and shown once, or set `BOXVECTOR_WEB_PASSWORD` |
+| `--version X.Y.Z`, `--deb FILE\|URL` | pick a release or a local package |
+| `--dry-run`, `--yes` | preview only / no questions |
+
+VPP comes from the fd.io repository (`packagecloud.io/fdio/release`). The
+installer writes `/etc/vpp/startup.conf` with the `linux_cp` and `linux_nl`
+plugins and `lcp lcp-sync on`, so interfaces created in VPP are mirrored
+into Linux where BIRD runs. An existing `startup.conf` is saved as
+`startup.conf.pre-boxvector`. VPP needs a NIC bound to `vfio-pci` before it can forward traffic.
+
 ### 1.1 BIRD
 
 boxvector works with **BIRD 2 (2.0.7 or newer) and BIRD 3**. BIRD 3 is not
