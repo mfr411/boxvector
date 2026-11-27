@@ -436,8 +436,24 @@ func (m *ifMgr) handle(w http.ResponseWriter, r *http.Request) {
 			fail(err)
 			return
 		}
+		gw := strings.TrimSpace(r.FormValue("gw"))
+		if op == "addaddr" && gw != "" {
+			if err = applyGW(&ifc{Addrs: []string{a}}, gw); err != nil {
+				fail(err)
+				return
+			}
+		}
 		err = m.change(strings.Replace(op, "addr", " address ", 1)+a+" on "+dev, func(s map[string]*ifc) error {
 			c := m.upsertAddr(s, dev)
+			if op == "addaddr" && gw != "" {
+				if c.GW != "" {
+					return errors.New("a gateway is already managed on " + dev + ", remove it first")
+				}
+				c.GW = gw
+				if defaultDev() != "" {
+					c.GWMetric = 200
+				}
+			}
 			has := false
 			for _, x := range c.Addrs {
 				has = has || x == a
@@ -458,7 +474,10 @@ func (m *ifMgr) handle(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 				c.Addrs = n
-				if c.Kind == "addr" && len(c.Addrs) == 0 && c.MTU == 0 {
+				if c.GW != "" && !gwCovered(c) {
+					c.GW, c.GWMetric = "", 0
+				}
+				if c.Kind == "addr" && len(c.Addrs) == 0 && c.MTU == 0 && c.GW == "" {
 					delete(s, dev)
 				}
 			}
@@ -555,7 +574,7 @@ func writeAddrFiles(s map[string]*ifc) error {
 	}
 	keep := map[string]bool{}
 	for _, c := range s {
-		if c.Kind != "addr" || (len(c.Addrs) == 0 && c.MTU == 0) {
+		if c.Kind != "addr" || (len(c.Addrs) == 0 && c.MTU == 0 && c.GW == "") {
 			continue
 		}
 		var b strings.Builder
@@ -564,6 +583,9 @@ func writeAddrFiles(s map[string]*ifc) error {
 		}
 		if c.MTU > 0 {
 			fmt.Fprintf(&b, "mtu %d\n", c.MTU)
+		}
+		if c.GW != "" {
+			fmt.Fprintf(&b, "gw %s %d\n", c.GW, c.GWMetric)
 		}
 		keep[c.Name] = true
 		if err := writeFileAtomic(filepath.Join(addrDir, c.Name), []byte(b.String()), 0o600); err != nil {
@@ -630,6 +652,18 @@ func applyAddrDiff(old, cur map[string]*ifc) error {
 				return errors.New("ip addr: " + out)
 			}
 		}
+		if o != nil && o.GW != "" && (n == nil || n.GW != o.GW) {
+			_, _ = ipRun("route", "del", "default", "via", o.GW, "dev", dev)
+		}
+		if n != nil && n.GW != "" {
+			args := []string{"route", "replace", "default", "via", n.GW, "dev", dev, "onlink"}
+			if n.GWMetric > 0 {
+				args = append(args, "metric", strconv.Itoa(n.GWMetric))
+			}
+			if out, err := ipRun(args...); err != nil {
+				return errors.New("ip route: " + out)
+			}
+		}
 		switch {
 		case n != nil && n.MTU > 0:
 			if out, err := ipRun("link", "set", "dev", dev, "mtu", strconv.Itoa(n.MTU)); err != nil {
@@ -651,6 +685,7 @@ while read -r k v; do
   case "$k" in
     addr) ip addr replace "$v" dev "$IFACE" ;;
     mtu) ip link set dev "$IFACE" mtu "$v" ;;
+    gw) set -- $v; if [ "${2:-0}" -gt 0 ]; then ip route replace default via "$1" dev "$IFACE" onlink metric "$2"; else ip route replace default via "$1" dev "$IFACE" onlink; fi ;;
   esac
 done < "$f"
 exit 0
@@ -755,4 +790,18 @@ func applyGW(c *ifc, gw string) error {
 		c.GWMetric = 200
 	}
 	return nil
+}
+
+// gwCovered reports whether the gateway is still inside one of the remaining addresses.
+func gwCovered(c *ifc) bool {
+	g, err := netip.ParseAddr(c.GW)
+	if err != nil {
+		return false
+	}
+	for _, a := range c.Addrs {
+		if p, perr := netip.ParsePrefix(a); perr == nil && p.Masked().Contains(g) {
+			return true
+		}
+	}
+	return false
 }

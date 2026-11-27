@@ -16,7 +16,8 @@
 {{else}}
 <input type="hidden" name="op" value="{{index .F "op"}}"><input type="hidden" name="dev" value="{{index .F "dev"}}">
 <p class="w">{{.Text}}</p><p class="w mono"><b>{{index .F "dev"}}</b></p>
-{{if eq (index .F "op") "addaddr"}}<label class="w">Address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" required autocomplete="off" placeholder="192.0.2.1/24"></label>{{end}}
+{{if eq (index .F "op") "addaddr"}}<label class="w">Address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" required autocomplete="off" placeholder="192.0.2.1/24"></label>
+<label class="w">Gateway<input name="gw" value="{{index .F "gw"}}" maxlength="45" autocomplete="off" placeholder="optional, must be in the same subnet"></label>{{end}}
 {{if eq (index .F "op") "deladdr"}}<label class="w">Address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" required autocomplete="off"></label>{{end}}
 {{if eq (index .F "op") "mtu"}}<label class="w">MTU<input name="mtu" value="{{index .F "mtu"}}" inputmode="numeric" maxlength="4" required autocomplete="off" placeholder="1500"></label>{{end}}
 {{if .Force}}<label class="w"><input type="checkbox" name="force" value="1"> I understand this may cut my own session, do it anyway</label>{{end}}

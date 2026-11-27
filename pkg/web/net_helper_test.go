@@ -53,3 +53,14 @@ func TestApplyGW(t *testing.T) {
 		t.Fatalf("stanza lacks gateway:\n%s", c.render())
 	}
 }
+
+func TestGWCovered(t *testing.T) {
+	c := &ifc{Addrs: []string{"10.1.1.2/24", "10.2.2.2/24"}, GW: "10.1.1.1"}
+	if !gwCovered(c) {
+		t.Fatal("gateway inside first subnet")
+	}
+	c.Addrs = []string{"10.2.2.2/24"}
+	if gwCovered(c) {
+		t.Fatal("gateway no longer covered")
+	}
+}
