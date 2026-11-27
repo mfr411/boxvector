@@ -72,10 +72,12 @@ Available Commands:
   passwd      Create a web user or change its password
 
 Flags:
-      --allow-public       allow listening on a non-loopback address without TLS
+      --allow-public       allow listening on a non-loopback address without TLS (default true)
       --auth-file string   user file (user:bcrypt per line, mode 600) (default "/etc/boxvector/web.users")
+      --file-auth          sign in with --auth-file users (bcrypt) instead of the server accounts
+      --fleet-key string   SSH private key (mode 600) enabling centralized Debian/Ubuntu patching of other routers
   -h, --help               help for web
-      --listen string      listen address (host:port) (default "127.0.0.1:8180")
+      --listen string      listen address (host:port) (default "0.0.0.0:6969")
       --state-dir string   directory for snapshots and history (default "/var/lib/boxvector")
       --tls-cert string    TLS certificate file (enables HTTPS)
       --tls-key string     TLS key file
