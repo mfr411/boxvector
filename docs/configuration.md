@@ -496,6 +496,14 @@ List of static routes to include in BIRD
 |------|---------|------------|
 | map[string]string   |       |          |
 
+### `static-routes`
+
+Static routes with type, distance and comment (extends statics)
+
+| Type | Default | Validation |
+|------|---------|------------|
+| []StaticRoute   |       |          |
+
 ### `srd-communities`
 
 List of communities to filter routes exported to kernel (if list is not empty, all other prefixes will not be exported)
@@ -543,6 +551,48 @@ Time in seconds between scans of the kernel routing table
 | Type | Default | Validation |
 |------|---------|------------|
 | int   | 10      |          |
+
+
+## StaticRoute
+### `prefix`
+
+Destination prefix (CIDR)
+
+| Type | Default | Validation |
+|------|---------|------------|
+| string   |       |          |
+
+### `via`
+
+Next hop IP (optional %interface suffix); empty for blackhole/unreachable/prohibit
+
+| Type | Default | Validation |
+|------|---------|------------|
+| string   |       |          |
+
+### `type`
+
+unicast, blackhole, unreachable or prohibit
+
+| Type | Default | Validation |
+|------|---------|------------|
+| string   | unicast      |          |
+
+### `distance`
+
+BIRD route preference 1-255 (0 = BIRD default)
+
+| Type | Default | Validation |
+|------|---------|------------|
+| int   |       |          |
+
+### `comment`
+
+Free text, written as a BIRD comment
+
+| Type | Default | Validation |
+|------|---------|------------|
+| string   |       |          |
 
 
 ## MRTInstance
