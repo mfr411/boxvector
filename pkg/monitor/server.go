@@ -284,7 +284,12 @@ func SetPassword(file, user, pw string) error {
 		}
 	}
 	out = append(out, user+":"+string(h))
-	return os.WriteFile(file, []byte(strings.Join(out, "\n")+"\n"), 0o600)
+	// atomic replace: a crash never leaves a half written users file
+	tmp := file + ".tmp"
+	if err := os.WriteFile(tmp, []byte(strings.Join(out, "\n")+"\n"), 0o640); err != nil {
+		return err
+	}
+	return os.Rename(tmp, file)
 }
 
 func rnd() string {
