@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="mfr411/boxvector"
 MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; BV_VERSION="latest"
-WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0
+WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0; FIB_ROUTES=""
 VPP_REPO_KEY=/usr/share/keyrings/fdio-release.gpg
 BIRD3_KEY=/usr/share/keyrings/cznic-labs-pkg.gpg
 
@@ -46,6 +46,7 @@ boxvector installer
   --deb FILE|URL           install this .deb instead of downloading a release
   --yes                    no questions (needs --mode)
   --dry-run                show what would be done
+  --fib-routes N           routes VPP must hold (sizes the heap; default: read from BIRD, else by RAM)
   --force                  skip the safety checks (NIC in use)
   -h, --help
 EOF
@@ -69,6 +70,7 @@ while [ $# -gt 0 ]; do
     --deb) DEB=${2:?}; shift 2 ;;
     --yes|-y) ASSUME_YES=1; shift ;;
     --dry-run) DRY=1; shift ;;
+    --fib-routes) FIB_ROUTES=${2:?}; shift 2 ;;
     --force) FORCE=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage >&2; die "unknown option: $1" ;;
@@ -357,10 +359,29 @@ write_vpp_config() {
   [ "$maxmb" -ge 25000 ] && { desc=4096; per_q=65536; }
   [ "$maxmb" -ge 100000 ] && per_q=131072
   local buffers=$(( per_q * nq )); [ "$buffers" -ge 65536 ] || buffers=65536
-  local heap=256; [ "$ram_mb" -ge 3500 ] && heap=512; [ "$ram_mb" -ge 7500 ] && heap=1024; [ "$ram_mb" -ge 15000 ] && heap=2048; [ "$ram_mb" -ge 60000 ] && heap=4096
+  # VPP idles at ~240 MB of main heap (measured on 26.10 with an empty FIB), so 256M leaves no room even for vppcfg apply.
+  # Floor: 512M whenever RAM allows; a big FIB grows it further (~300 B/route estimate, 128 MB base).
+  local routes=${FIB_ROUTES:-}
+  if [ -z "$routes" ] && command -v birdc >/dev/null; then
+    # only the tables that reach the kernel/VPP; rpki4/rpki6 hold ROAs, not routes
+    routes=$(for t in master4 master6; do birdc show route count table $t 2>/dev/null; done | awk '/ routes for / {n+=$1} END {print n+0}')
+  fi
+  local heap=256; [ "$ram_mb" -ge 1800 ] && heap=512; [ "$ram_mb" -ge 7500 ] && heap=1024; [ "$ram_mb" -ge 15000 ] && heap=2048; [ "$ram_mb" -ge 60000 ] && heap=4096
+  if [ "${routes:-0}" -gt 0 ] 2>/dev/null; then
+    local need=$(( (routes * 300 / 1000000 + 128 + 63) / 64 * 64 ))
+    [ "$need" -le "$heap" ] || { log "VPP heap sized for $routes routes: ${heap}M -> ${need}M"; heap=$need; }
+    # BIRD keeps ~550 B/route in RAM too; VPP hugepages are pinned
+    local bird_mb=$(( routes * 550 / 1000000 ))
+    [ $(( bird_mb + heap + buffers * 24 / 10000 )) -le $(( ram_mb * 95 / 100 )) ] \
+      || warn "RAM tight: BIRD ~${bird_mb} MB + VPP heap ${heap} MB + buffers $(( buffers * 24 / 10000 )) MB vs ${ram_mb} MB installed. Expect swapping/OOM with a full table: add RAM or use --fib-routes with a smaller table"
+  fi
   # hugepages (2 MB): buffers*2.3KB + heap + statseg + slack, never more than 40% of RAM
   local seg=256; [ "$ram_mb" -ge 4000 ] || seg=64
   local hp_mb=$(( buffers * 24 / 10000 + heap + seg + 128 )); local cap=$(( ram_mb / 2 ))
+  # pinned hugepages must leave room for BIRD (~550 B/route) and the OS (~350 MB)
+  if [ "${routes:-0}" -gt 0 ] 2>/dev/null; then
+    local room=$(( ram_mb - routes * 550 / 1000000 - 350 )); [ "$room" -ge "$cap" ] || cap=$room
+  fi
   [ "$hp_mb" -le "$cap" ] || { warn "RAM small: trimming VPP buffers to fit 50% of memory"; buffers=$(( (cap - heap - seg - 128) * 10000 / 24 )); hp_mb=$cap; }
   [ "$buffers" -ge 16384 ] || die "not enough RAM for VPP (${ram_mb} MB)"
   local hugepages=$(( (hp_mb + 1) / 2 ))
@@ -485,7 +506,9 @@ fetch_deb() {
   run curl -fsSL "$url" -o "$out"
   # verify against SHA256SUMS when the release has one
   local sums; sums=$(dirname "$url")/SHA256SUMS
-  if curl -fsSL "$sums" -o "$out.sums" 2>/dev/null; then
+  if [ "$DRY" = 1 ]; then
+    :
+  elif curl -fsSL "$sums" -o "$out.sums" 2>/dev/null; then
     ( cd "$(dirname "$out")" && grep " $(basename "$url")\$" "$out.sums" | sed "s# .*# $(basename "$out")#" | sha256sum -c - >/dev/null ) \
       || die "SHA256 mismatch for $(basename "$url")"
     log "sha256 verified"
