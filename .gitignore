@@ -15,15 +15,6 @@ pathvector-*-release.pdf
 # Coverage
 cover.*
 
-# Vendor build
-vendorbuild/juniper/*.pem
-vendorbuild/juniper/jetez/
-vendorbuild/juniper/bird/bird-*.tgz
-vendorbuild/juniper/bird/.build/
-vendorbuild/juniper/bird/jetez/
-vendorbuild/cisco/ioxclient
-vendorbuild/mikrotik/docker-buildx
-
 # Testing
 test-cache/
 test-conf.yml
