@@ -34,14 +34,16 @@ const (
 var reBr = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_-]{0,14}$`)
 
 type ifc struct {
-	Kind   string   `json:"kind"` // vlan | bridge | addr (extra settings on an existing interface)
-	Name   string   `json:"name"`
-	Parent string   `json:"parent,omitempty"`
-	VID    int      `json:"vid,omitempty"`
-	Ports  []string `json:"ports,omitempty"`
-	MTU    int      `json:"mtu,omitempty"`
-	Orig   int      `json:"orig_mtu,omitempty"` // MTU before boxvector changed it (kind addr)
-	Addrs  []string `json:"addrs,omitempty"`
+	Kind     string   `json:"kind"` // vlan | bridge | addr (extra settings on an existing interface)
+	Name     string   `json:"name"`
+	Parent   string   `json:"parent,omitempty"`
+	VID      int      `json:"vid,omitempty"`
+	Ports    []string `json:"ports,omitempty"`
+	MTU      int      `json:"mtu,omitempty"`
+	Orig     int      `json:"orig_mtu,omitempty"` // MTU before boxvector changed it (kind addr)
+	Addrs    []string `json:"addrs,omitempty"`
+	GW       string   `json:"gw,omitempty"`        // optional gateway, must be on-link for one of Addrs
+	GWMetric int      `json:"gw_metric,omitempty"` // >0 when another default route already exists
 }
 
 type ifPending struct {
@@ -124,6 +126,12 @@ func (c *ifc) render() string {
 			}
 			if c.MTU > 0 {
 				fmt.Fprintf(&b, "\tmtu %d\n", c.MTU)
+			}
+		}
+		if g := c.GW; g != "" && len(addrs) > 0 && strings.Contains(g, ":") == (fam == "inet6") {
+			fmt.Fprintf(&b, "\tgateway %s\n", g)
+			if c.GWMetric > 0 {
+				fmt.Fprintf(&b, "\tmetric %d\n", c.GWMetric)
 			}
 		}
 		return b.String()
@@ -370,6 +378,10 @@ func (m *ifMgr) handle(w http.ResponseWriter, r *http.Request) {
 			}
 			c.Addrs = []string{a}
 		}
+		if err = applyGW(c, r.FormValue("gw")); err != nil {
+			fail(err)
+			return
+		}
 		err = m.change("Add VLAN "+name, func(s map[string]*ifc) error {
 			if _, ok := s[name]; ok || devExists(name) {
 				return errors.New(name + " already exists")
@@ -402,6 +414,10 @@ func (m *ifMgr) handle(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			c.Addrs = []string{a}
+		}
+		if err = applyGW(c, r.FormValue("gw")); err != nil {
+			fail(err)
+			return
 		}
 		err = m.change("Add bridge "+name, func(s map[string]*ifc) error {
 			if _, ok := s[name]; ok || devExists(name) {
@@ -710,4 +726,33 @@ func containsStr(l []string, v string) bool {
 		}
 	}
 	return false
+}
+
+// applyGW validates an optional gateway: same family as one of the interface addresses and inside its
+// subnet. When the host already has a default route the new one gets a higher metric, so it can never
+// replace the route that carries management traffic.
+func applyGW(c *ifc, gw string) error {
+	gw = strings.TrimSpace(gw)
+	if gw == "" {
+		return nil
+	}
+	g, err := netip.ParseAddr(gw)
+	if err != nil || g.IsUnspecified() || g.IsMulticast() || g.Is4In6() {
+		return errors.New("invalid gateway address")
+	}
+	ok := false
+	for _, a := range c.Addrs {
+		p, perr := netip.ParsePrefix(a)
+		if perr == nil && p.Masked().Contains(g) && p.Addr() != g {
+			ok = true
+		}
+	}
+	if !ok {
+		return errors.New("gateway must be inside the subnet of the interface address (an address is required)")
+	}
+	c.GW = g.String()
+	if defaultDev() != "" {
+		c.GWMetric = 200
+	}
+	return nil
 }

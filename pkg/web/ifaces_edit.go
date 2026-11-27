@@ -33,7 +33,7 @@ func (s *server) ifPage(w http.ResponseWriter, sess *session, f map[string]strin
 
 func ifForm(r *http.Request) map[string]string {
 	f := map[string]string{}
-	for _, k := range []string{"op", "dev", "parent", "vid", "name", "ports", "addr", "mtu"} {
+	for _, k := range []string{"op", "dev", "parent", "vid", "name", "ports", "addr", "gw", "mtu"} {
 		v := r.PostFormValue(k)
 		if v == "" {
 			v = r.URL.Query().Get(k)
@@ -99,7 +99,7 @@ func (s *server) ifPost(w http.ResponseWriter, r *http.Request, sess *session) {
 		v.Set("force", "1")
 	}
 	msg, code := s.netCall("/iface", v)
-	sum := title + " " + strings.TrimSpace(f["dev"]+" "+f["parent"]+" "+f["vid"]+" "+f["name"]+" "+f["addr"]+" "+f["mtu"])
+	sum := title + " " + strings.TrimSpace(f["dev"]+" "+f["parent"]+" "+f["vid"]+" "+f["name"]+" "+f["addr"]+" "+f["gw"]+" "+f["mtu"])
 	s.store.log(Event{Time: time.Now(), User: sess.user, Action: "interface", OK: msg == "", Summary: strings.Join(strings.Fields(sum), " "), Output: msg})
 	if msg != "" {
 		s.ifPage(w, sess, f, map[string]any{"Mode": mode, "Title": title, "Text": text, "Err": msg, "Force": code == http.StatusConflict, "Danger": f["op"] == "del"})

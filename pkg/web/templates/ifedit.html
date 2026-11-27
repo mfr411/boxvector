@@ -5,11 +5,12 @@
 <form class="frm" method="post" action="/ifaces/{{if eq .Mode "new"}}new{{else}}act{{end}}"><input type="hidden" name="csrf" value="{{$.CSRF}}">
 {{if eq .Mode "new"}}
 <label>Type<select name="op" id="ifop"><option value="vlan"{{if eq (index .F "op") "vlan"}} selected{{end}}>VLAN</option><option value="bridge"{{if eq (index .F "op") "bridge"}} selected{{end}}>Bridge</option></select></label>
-<label>Parent interface (VLAN)<input name="parent" list="ifdevs" value="{{index .F "parent"}}" maxlength="15" autocomplete="off" placeholder="ens19"></label>
+<label>Parent interface (VLAN)<input name="parent" list="ifdevs" value="{{index .F "parent"}}" maxlength="15" autocomplete="off" placeholder="e.g. eth0, bond0, br0, or another VLAN"></label>
 <label>VLAN ID<input name="vid" value="{{index .F "vid"}}" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="100"></label>
 <label>Bridge name<input name="name" value="{{index .F "name"}}" maxlength="15" autocomplete="off" placeholder="br0"></label>
 <label class="w">Bridge ports (space separated)<input name="ports" value="{{index .F "ports"}}" autocomplete="off" placeholder="optional"></label>
 <label class="w">IP address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" autocomplete="off" placeholder="optional, 192.0.2.1/24"></label>
+<label class="w">Gateway<input name="gw" value="{{index .F "gw"}}" maxlength="45" autocomplete="off" placeholder="optional, must be in the same subnet"></label>
 <datalist id="ifdevs">{{range .Devs}}<option value="{{.}}">{{end}}</datalist>
 <p class="w s">Saved to /etc/network/interfaces.d/boxvector-* and applied with ifreload. Reverts automatically unless confirmed.</p>
 {{else}}
