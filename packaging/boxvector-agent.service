@@ -1,0 +1,12 @@
+[Unit]
+Description=boxvector fleet agent (heartbeat and approved patching)
+Documentation=https://boxvector.co
+After=network-online.target bird.service
+Wants=network-online.target
+ConditionPathExists=/etc/boxvector/agent.json
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/boxvector agent run -c /etc/boxvector.yml
+Restart=always
+RestartSec=5

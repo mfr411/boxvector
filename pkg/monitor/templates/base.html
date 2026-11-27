@@ -1,0 +1,25 @@
+{{define "head"}}<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>boxvector monitor</title><link rel="icon" href="data:,">
+<style>
+*{box-sizing:border-box}body{margin:0;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#e9ecf1;color:#1f2430}
+a{color:#2a5fd6;text-decoration:none}a:hover{text-decoration:underline}
+.top{background:#fff;border-bottom:1px solid #cfd5df;height:38px;display:flex;align-items:center;padding:0 14px;gap:18px}
+.top b{font-weight:600;letter-spacing:.2px}.top nav{display:flex;gap:4px;flex:1}
+.top nav a{padding:5px 10px;border-radius:3px;color:#4a5262}.top nav a.on{background:#e6ecf8;color:#1f3f8f}
+.top form{margin:0}.wrap{max-width:1180px;margin:14px auto;padding:0 14px}
+.card{background:#fff;border:1px solid #cfd5df;border-radius:3px;margin-bottom:14px}
+.card h2{margin:0;padding:7px 12px;font-size:12px;font-weight:600;color:#4a5262;background:#f4f6fa;border-bottom:1px solid #cfd5df}
+.in{padding:10px 12px}.sum{display:flex;gap:26px;padding:10px 12px}.sum div span{display:block;font-size:11px;color:#6b7280}.sum div b{font-size:18px;font-weight:600}
+table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:6px 12px;border-bottom:1px solid #eceff4;white-space:nowrap}
+th{font-size:11px;font-weight:600;color:#6b7280;background:#fafbfd}tr:last-child td{border-bottom:0}.mono{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;background:#aab1bf}.dot.on{background:#2f9e5b}
+.tag{font-size:11px;padding:1px 7px;border-radius:9px;background:#eef1f6;color:#4a5262}.tag.ok{background:#e4f4ea;color:#1f6b3d}.tag.failed,.tag.rolledback{background:#fbe7e5;color:#a02a22}.tag.queued,.tag.running{background:#e6ecf8;color:#1f3f8f}
+button,.btn{font:inherit;padding:4px 12px;border:1px solid #b9c1ce;border-radius:3px;background:#f7f8fb;color:#1f2430;cursor:pointer}button:hover{background:#eef1f7}button:disabled{color:#aab1bf;cursor:default}
+input[type=text],input[type=password],input[type=file],select,textarea{font:inherit;padding:4px 7px;border:1px solid #b9c1ce;border-radius:3px;background:#fff}
+.msg{background:#e6ecf8;border:1px solid #c3d0ee;color:#1f3f8f;padding:6px 12px;border-radius:3px;margin-bottom:14px}.err{color:#a02a22}.s{color:#6b7280;font-size:12px}
+.bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-bottom:1px solid #eceff4}.kv{display:grid;grid-template-columns:150px 1fr;gap:4px 12px;padding:10px 12px}.kv span{color:#6b7280}
+pre{margin:0;padding:8px 12px;background:#f4f6fa;font:12px ui-monospace,Menlo,monospace;overflow:auto}
+.login{max-width:300px;margin:12vh auto}.login input{width:100%;margin:4px 0 10px}
+</style></head><body>{{end}}
+{{define "nav"}}<div class="top"><b>boxvector monitor</b><nav><a href="/" class="{{if eq . "devices"}}on{{end}}">Devices</a><a href="/releases" class="{{if eq . "releases"}}on{{end}}">Releases</a><a href="/enroll" class="{{if eq . "enroll"}}on{{end}}">Enroll</a></nav><form method="post" action="/logout"><a href="/logout">Sign out</a></form></div><div class="wrap">{{end}}
+{{define "foot"}}</div></body></html>{{end}}

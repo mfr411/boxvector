@@ -1,0 +1,10 @@
+{{template "head"}}{{template "nav" .Nav}}
+{{if .Msg}}<div class="msg">{{.Msg}}</div>{{end}}
+<div class="card"><div class="sum"><div><span>Devices</span><b>{{len .Rows}}</b></div><div><span>Online</span><b>{{.On}}</b></div><div><span>Offline</span><b>{{.Off}}</b></div><div><span>Latest release</span><b>{{if .Latest}}{{.Latest}}{{else}}-{{end}}</b></div><div><span>Behind latest</span><b>{{.Out}}</b></div></div></div>
+<form method="post" action="/act" class="card"><h2>Devices</h2>
+<div class="bar"><select name="version">{{range .Rel}}<option value="{{.Version}}">{{.Version}} · {{.Arch}}</option>{{end}}</select><button name="do" value="approve" {{if not .Rel}}disabled{{end}}>Approve patch</button><button name="do" value="cancel">Cancel queued</button><span class="s">Select devices first. One device patches at a time; the agent verifies BIRD and rolls back on failure.</span></div>
+<table><tr><th></th><th>Name</th><th>Status</th><th>Version</th><th>BIRD</th><th>Sessions</th><th>ASN</th><th>Address</th><th>Last seen</th><th>Patch</th></tr>
+{{range .Rows}}<tr><td><input type="checkbox" name="id" value="{{.ID}}"></td><td><a href="/device?id={{.ID}}">{{.Name}}</a></td><td><span class="dot {{if .On}}on{{end}}"></span>{{if .On}}online{{else}}offline{{end}}</td><td class="mono">{{.Info.Version}}</td><td class="mono">{{.Info.Bird}}</td><td>{{.Info.Established}}/{{.Info.Sessions}}</td><td>{{if .Info.ASN}}AS{{.Info.ASN}}{{end}}</td><td class="mono">{{.RemoteIP}}</td><td>{{ago .LastSeen}}</td><td>{{if .Patch.Status}}<span class="tag {{.Patch.Status}}">{{.Patch.Status}} {{.Patch.Version}}</span>{{end}}</td></tr>
+{{else}}<tr><td colspan="10" class="s">No devices yet. Create an enroll token under Enroll, then run the install command on a boxvector host.</td></tr>{{end}}</table></form>
+<div class="card"><h2>Recent events</h2><table>{{range .Events}}<tr><td class="s">{{ts .At}}</td><td>{{.Msg}}</td></tr>{{else}}<tr><td class="s">Nothing yet.</td></tr>{{end}}</table></div>
+{{template "foot"}}

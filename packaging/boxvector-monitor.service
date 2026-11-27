@@ -1,0 +1,25 @@
+[Unit]
+Description=boxvector central monitor
+After=network-online.target
+
+[Service]
+Type=simple
+User=bvmonitor
+Group=bvmonitor
+ExecStart=/usr/bin/boxvector monitor --listen 127.0.0.1:8195 --data /var/lib/boxvector-monitor --auth-file /etc/boxvector-monitor/users
+Restart=on-failure
+RestartSec=5
+StateDirectory=boxvector-monitor
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/boxvector-monitor
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes

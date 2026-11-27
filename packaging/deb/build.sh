@@ -18,6 +18,8 @@ mkdir -p "$pkg/usr/bin" "$out"
 
 install -D -m 0644 "$root/packaging/boxvector-web.service" "$pkg/lib/systemd/system/boxvector-web.service"
 install -D -m 0644 "$root/packaging/boxvector-term.service" "$pkg/lib/systemd/system/boxvector-term.service"
+install -D -m 0644 "$root/packaging/boxvector-agent.service" "$pkg/lib/systemd/system/boxvector-agent.service"
+install -D -m 0644 "$root/packaging/boxvector-monitor.service" "$pkg/usr/share/boxvector/boxvector-monitor.service"
 install -D -m 0644 "$root/packaging/nginx-boxvector.conf" "$pkg/usr/share/boxvector/nginx-boxvector.conf"
 install -D -m 0644 "$root/packaging/boxvector.yml.example" "$pkg/usr/share/boxvector/boxvector.yml.example"
 install -D -m 0644 "$root/LICENSE" "$pkg/usr/share/doc/boxvector/copyright"
