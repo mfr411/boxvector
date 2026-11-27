@@ -257,3 +257,15 @@ body.rzing{cursor:col-resize;user-select:none}
 .fwb pre.diff span{display:inline}
 .fwb .frm>.act{position:sticky;bottom:-14px;background:#f4f5f8;margin:6px -16px -14px;padding:10px 16px;border-top:1px solid #d3d6de;z-index:3}
 input.ro{background:#eceef3;color:#666}
+
+/* default layout: fill the window, columns share width proportionally */
+.ift:not(.pt):not(.rt){width:100%;min-width:1090px}
+.pt col:nth-child(1){width:30px}
+.pt col:nth-child(2){width:300px}
+.pt col:nth-child(3){width:190px}
+.pt col:nth-child(4){width:100px}
+.pt col:nth-child(5){width:140px}
+.pt col:nth-child(6){width:100px}
+.pt col:nth-child(7){width:100px}
+.pt col:nth-child(8){width:190px}
+.pt{width:100%;min-width:1150px}
