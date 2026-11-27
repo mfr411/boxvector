@@ -34,7 +34,7 @@ type Options struct {
 	TLSKey     string
 	TrustProxy bool
 	Version    string
-	SystemAuth bool   // sign in with the server's own accounts (root / sudo group)
+	SystemAuth bool // sign in with the server's own accounts (root / sudo group)
 }
 
 type server struct {
@@ -117,7 +117,6 @@ func Serve(opt Options) error {
 	for _, p := range []string{"login", "peers", "peer_new", "config", "review", "routes", "logs", "interfaces"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
-
 
 	static, _ := fs.Sub(assets, "static")
 	mux := http.NewServeMux()
