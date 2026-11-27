@@ -138,6 +138,7 @@ func Serve(opt Options) error {
 	mux.HandleFunc("GET /api/ifaces", s.authed(s.ifacesAPI))
 	mux.HandleFunc("GET /vpp", s.authed(s.vppPage))
 	mux.HandleFunc("GET /api/vpp", s.authed(s.vppAPI))
+	mux.HandleFunc("GET /api/peers", s.authed(s.peersAPI))
 	mux.HandleFunc("GET /api/status", s.authed(s.statusAPI))
 	mux.HandleFunc("GET /peers/new", s.authed(s.peerNewPage))
 	mux.HandleFunc("POST /peers/new", s.authed(s.peerNewPost))
@@ -299,7 +300,7 @@ type summary struct {
 
 var reCount = regexp.MustCompile(`(\d+) of \d+ routes for \d+ networks in table master([46])`)
 
-func (s *server) peersPage(w http.ResponseWriter, r *http.Request, sess *session) {
+func (s *server) peersData() ([]peerRow, summary, string) {
 	ri := s.router()
 	var rows []peerRow
 	var sum summary
@@ -364,8 +365,43 @@ func (s *server) peersPage(w http.ResponseWriter, r *http.Request, sess *session
 			}
 		}
 	}
+	return rows, sum, errMsg
+}
+
+func (s *server) peersPage(w http.ResponseWriter, r *http.Request, sess *session) {
+	rows, sum, errMsg := s.peersData()
 	s.render(w, "peers", ctxPage{Title: "Peers", Nav: "peers", User: sess.user, CSRF: sess.csrf,
 		Data: map[string]any{"Rows": rows, "Sum": sum, "Err": errMsg}})
+}
+
+// peersAPI feeds the live refresh of the peers table (polled every second).
+func (s *server) peersAPI(w http.ResponseWriter, r *http.Request, sess *session) {
+	rows, sum, errMsg := s.peersData()
+	type pj struct {
+		Proto string `json:"n"`
+		State string `json:"st"`
+		Class string `json:"cl"`
+		Up    bool   `json:"up"`
+		Off   bool   `json:"off"`
+		Im    int    `json:"im"`
+		Ex    int    `json:"ex"`
+		Since string `json:"since"`
+	}
+	out := struct {
+		Peers []pj    `json:"peers"`
+		Sum   summary `json:"sum"`
+		Err   string  `json:"err"`
+	}{Peers: []pj{}, Sum: sum, Err: errMsg}
+	for _, p := range rows {
+		st := p.State
+		if p.Info != "" {
+			st = p.Info
+		}
+		out.Peers = append(out.Peers, pj{p.Proto, st, p.Class, p.Info == "Established", p.Off, p.Imported, p.Exported, p.Since})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(out)
 }
 
 // ---- policy rules (tri-state per peer: inherit / on / off) ----
