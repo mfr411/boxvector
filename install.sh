@@ -181,6 +181,18 @@ install_bird() {
 if [ "$ESTIMATE" != 1 ]; then log "BIRD ${BIRD}"; install_bird; fi
 
 # ---------- VPP ----------
+# vppcfg drives the Interfaces page in VPP mode. It is not packaged for Debian, so it lives in a venv that can see the
+# distro's python3-vpp-api (vpp_papi must match the installed VPP). Idempotent: skipped when already runnable.
+install_vppcfg() {
+  local v=/opt/vppcfg-venv
+  if [ "$DRY" = 1 ]; then log "would install vppcfg into $v"; return 0; fi
+  if [ -x "$v/bin/vppcfg" ] && "$v/bin/vppcfg" -h >/dev/null 2>&1; then return 0; fi
+  log "installing vppcfg into $v"
+  python3 -m venv --system-site-packages "$v" || die "cannot create venv $v"
+  "$v/bin/pip" install -q vppcfg || die "pip install vppcfg failed"
+  "$v/bin/vppcfg" -h >/dev/null 2>&1 || warn "vppcfg installed but not runnable; VPP Interfaces page stays read-only"
+}
+
 install_vpp() {
   if ! has_candidate vpp; then
     log "adding fd.io VPP repository"
@@ -189,7 +201,8 @@ install_vpp() {
     run apt-get update -qq
     [ "$DRY" = 1 ] || has_candidate vpp || die "VPP is not available for $ID $CODENAME/$ARCH on fd.io"
   fi
-  need vpp vpp-plugin-core vpp-plugin-dpdk
+  need vpp vpp-plugin-core vpp-plugin-dpdk python3-vpp-api python3-venv python3-pip
+  install_vppcfg
   write_vpp_config
   if [ -d /run/systemd/system ] && [ "$DRY" = 0 ]; then
     systemctl enable vpp >/dev/null 2>&1 || true
