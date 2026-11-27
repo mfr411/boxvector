@@ -1,13 +1,15 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/boxvector-logo-white.svg">
-    <img src="assets/boxvector-logo.svg" alt="Boxvector" width="320">
+    <img src="assets/boxvector-logo.svg" alt="boxvector" width="320">
   </picture>
 </p>
 
-# Boxvector
+# boxvector
 
-Boxvector generates and manages BGP configuration for [BIRD](https://bird.nic.cz)
+**powered by [nexcolo](https://www.nexcolo.com/)**
+
+boxvector generates and manages BGP configuration for [BIRD](https://bird.nic.cz)
 2 and 3 from a single YAML file, with a web UI for day-to-day operations.
 Inspired by [Pathvector](https://github.com/natesales/pathvector), it focuses on
 BIRD 3, security hardening and a web interface.
@@ -41,7 +43,7 @@ distributions are **not supported**; the package refuses to install there.
 
 ### 1.1 BIRD
 
-Boxvector works with **BIRD 2 (2.0.7 or newer) and BIRD 3**. BIRD 3 is not
+boxvector works with **BIRD 2 (2.0.7 or newer) and BIRD 3**. BIRD 3 is not
 required. The installed version is detected on every run (`bird --version`)
 and the config is generated for it. BIRD 3-only options such as
 `bird-threads` are skipped on BIRD 2 with a warning.
@@ -81,7 +83,7 @@ echo "deb [signed-by=/usr/share/keyrings/cznic-labs-pkg.gpg] https://pkg.labs.ni
 sudo apt update && sudo apt install bird3 bgpq4
 ```
 
-### 1.2 Boxvector
+### 1.2 boxvector
 
 Download the `.deb` for your architecture from the
 [Releases](https://github.com/mfr411/boxvector/releases) page and install it:
@@ -249,7 +251,7 @@ Both use the same `boxvector.yml`; nothing in your config has to change.
 | `bird-threads` | ignored (warning) | `threads N;` written |
 | Package name | `bird2` | `bird3` |
 
-Check which one Boxvector sees (the first log lines of every run):
+Check which one boxvector sees (the first log lines of every run):
 
 ```sh
 sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml --dry-run 2>&1 | grep 'BIRD version'
@@ -269,7 +271,7 @@ sudo tar czf /root/bird2-backup-$(date +%F).tgz /etc/bird /etc/boxvector
 # 3. replace the package (bird3 conflicts with bird2, apt swaps them)
 sudo apt install bird3
 
-# 4. the bird3 package resets /etc/bird ownership; restore Boxvector's access
+# 4. the bird3 package resets /etc/bird ownership; restore boxvector's access
 sudo dpkg-reconfigure boxvector
 
 # 5. regenerate for BIRD 3 and check the sessions
@@ -324,7 +326,7 @@ Full reference per command: [docs/cli.md](docs/cli.md).
 
 <!-- cli:begin -->
 ```
-Boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).
+boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).
 
 Usage:
   boxvector [command]
@@ -377,18 +379,17 @@ release. CI also checks every config in `tests/` against BIRD 2.0.12, 2.20.0,
 
 ## Credits
 
-Boxvector is built on top of open-source work by others:
+boxvector is built on top of open-source work by others:
 
 - **[Pathvector](https://github.com/natesales/pathvector)** by
   [Nate Sales](https://github.com/natesales) and contributors – the project that
-  inspired Boxvector (config model, templates, IRR/RPKI/PeeringDB
+  inspired boxvector (config model, templates, IRR/RPKI/PeeringDB
   filtering, optimizer). Thank you.
 - **[BIRD Internet Routing Daemon](https://bird.nic.cz)** by CZ.NIC Labs.
 - **[bgpq4](https://github.com/bgp/bgpq4)** for IRR prefix lists,
   **[PeeringDB](https://www.peeringdb.com)** for network data.
 
-Boxvector is maintained by [PT Atharva Telematika Persada](https://atharva.co.id)
-(Muhammad Fhandika Rafif).
+boxvector is powered by [nexcolo](https://www.nexcolo.com/).
 
 ## License
 

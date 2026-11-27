@@ -18,7 +18,7 @@ func init() {
 }
 
 func versionBanner() string {
-	buf := fmt.Sprintf(`Boxvector %s
+	buf := fmt.Sprintf(`boxvector %s
 Built %s on %s
 Inspired by Pathvector by Nate Sales (https://github.com/natesales/pathvector)
 `, version, commit, date)

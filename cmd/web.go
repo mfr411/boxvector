@@ -55,7 +55,7 @@ var webCmd = &cobra.Command{
 		if (webTLSCert == "") != (webTLSKey == "") {
 			log.Fatal("--tls-cert and --tls-key must be used together")
 		}
-		log.Infof("Boxvector web UI on %s (config %s)", webListen, configFile)
+		log.Infof("boxvector web UI on %s (config %s)", webListen, configFile)
 		err = web.Serve(web.Options{
 			Listen: webListen, ConfigFile: configFile, AuthFile: webAuthFile, StateDir: webStateDir,
 			TLSCert: webTLSCert, TLSKey: webTLSKey, TrustProxy: webTrustProxy, SystemAuth: !webFileAuth,

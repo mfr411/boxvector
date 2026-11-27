@@ -1,4 +1,4 @@
-// Boxvector web UI: peer table filter and apply confirmation (no inline JS, CSP friendly).
+// boxvector web UI: peer table filter and apply confirmation (no inline JS, CSP friendly).
 document.addEventListener("DOMContentLoaded", function () {
   var f = document.getElementById("filter");
   if (f) {

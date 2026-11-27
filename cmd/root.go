@@ -32,7 +32,7 @@ var (
 // CLI Commands
 var rootCmd = &cobra.Command{
 	Use:   "boxvector",
-	Short: "Boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).",
+	Short: "boxvector generates and manages BIRD 2/3 BGP configuration (fork of Pathvector).",
 }
 
 func loadConfig() (*config.Config, error) {

@@ -1,4 +1,4 @@
-# Boxvector example configuration. Full reference: docs/ in the repository.
+# boxvector example configuration. Full reference: docs/ in the repository.
 asn: 65530                       # your ASN
 router-id: 192.0.2.1
 source4: 192.0.2.1

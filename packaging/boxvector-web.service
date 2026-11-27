@@ -1,5 +1,5 @@
 [Unit]
-Description=Boxvector web UI
+Description=boxvector web UI
 Documentation=https://github.com/mfr411/boxvector
 After=network-online.target bird.service
 Wants=network-online.target

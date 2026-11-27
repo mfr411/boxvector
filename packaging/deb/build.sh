@@ -27,7 +27,7 @@ cat > "$pkg/DEBIAN/control" <<CTRL
 Package: boxvector
 Version: $version
 Architecture: $arch
-Maintainer: PT Atharva Telematika Persada <noc@atharva.co.id>
+Maintainer: nexcolo <https://www.nexcolo.com/>
 Depends: adduser, libc6 (>= 2.35), libcrypt1
 Recommends: bird3 | bird2, bgpq4
 Section: net
@@ -35,7 +35,7 @@ Priority: optional
 Homepage: https://github.com/mfr411/boxvector
 Installed-Size: $(du -sk "$pkg/usr" | cut -f1)
 Description: BGP configuration generator and web UI for BIRD 2/3
- Boxvector generates BIRD configuration (filters, IRR/RPKI, PeeringDB
+ boxvector generates BIRD configuration (filters, IRR/RPKI, PeeringDB
  limits) from one YAML file, validates it with bird -p and reloads BIRD.
  Includes a web UI with login, diff review, snapshots and rollback.
 CTRL

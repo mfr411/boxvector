@@ -12,8 +12,8 @@ import (
 func TestOptimizer(t *testing.T) {
 	// Sends real ICMP/UDP probes from dummy0 and loops until the probe cache
 	// fills; it hangs on runners without working IPv6. Opt-in.
-	if os.Getenv("BOXVECTOR_PROBE_TESTS") != "1" {
-		t.Skip("set BOXVECTOR_PROBE_TESTS=1 (needs root, dummy0 and IPv6)")
+	if os.Getenv("boxvector_PROBE_TESTS") != "1" {
+		t.Skip("set boxvector_PROBE_TESTS=1 (needs root, dummy0 and IPv6)")
 	}
 	args := []string{
 		"--verbose",

@@ -127,6 +127,7 @@ func Serve(opt Options) error {
 	mux.HandleFunc("GET /{$}", s.authed(s.peersPage))
 	mux.HandleFunc("GET /interfaces", s.authed(s.ifacesPage))
 	mux.HandleFunc("GET /api/ifaces", s.authed(s.ifacesAPI))
+	mux.HandleFunc("GET /api/status", s.authed(s.statusAPI))
 	mux.HandleFunc("GET /peers/new", s.authed(s.peerNewPage))
 	mux.HandleFunc("POST /peers/new", s.authed(s.peerNewPost))
 	mux.HandleFunc("GET /config", s.authed(s.configPage))

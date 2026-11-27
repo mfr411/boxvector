@@ -1,5 +1,5 @@
 #!/bin/sh
-# Boxvector supports Debian >= 12 and Ubuntu >= 22.04 (and derivatives) only.
+# boxvector supports Debian >= 12 and Ubuntu >= 22.04 (and derivatives) only.
 set -e
 [ "$1" = install ] || [ "$1" = upgrade ] || exit 0
 [ -n "$BOXVECTOR_SKIP_OS_CHECK" ] && exit 0

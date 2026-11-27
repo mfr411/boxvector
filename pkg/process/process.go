@@ -633,7 +633,7 @@ func Run(configFilename, lockFile, version string, noConfigure, dryRun, withdraw
 		}
 	}
 
-	log.Infof("Starting Boxvector %s", version)
+	log.Infof("Starting boxvector %s", version)
 	startTime := time.Now()
 
 	// Load the config file from config file
