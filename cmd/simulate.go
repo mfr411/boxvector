@@ -102,7 +102,7 @@ Example:
 		waitForSocket(filepath.Join(root, "bird.ctl"))
 
 		var peerAS uint32
-	sessions := make([]simulate.Session, 0, len(args))
+		sessions := make([]simulate.Session, 0, len(args))
 		for _, arg := range args {
 			name, file, ok := cutPeer(arg)
 			if !ok {

@@ -9,15 +9,15 @@ import (
 
 // Attribute IDs of the standard BGP path attributes used by Boxvector.
 const (
-	Origin        = 1
-	ASPath        = 2
-	NextHop       = 3
-	MED           = 4
-	LocalPref     = 5
-	Communities   = 8
-	OriginatorID  = 9
-	MPNextHop     = 14
-	MPReachNLRI   = 16
+	Origin       = 1
+	ASPath       = 2
+	NextHop      = 3
+	MED          = 4
+	LocalPref    = 5
+	Communities  = 8
+	OriginatorID = 9
+	MPNextHop    = 14
+	MPReachNLRI  = 16
 )
 
 // Flag bits of a path attribute (RFC 4271 section 4.3).

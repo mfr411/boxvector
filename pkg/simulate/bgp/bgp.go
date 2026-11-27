@@ -59,15 +59,15 @@ func (s *Session) Close() error {
 
 func (s *Session) handshake() error {
 	open := make([]byte, 16)
-	binary.BigEndian.PutUint16(open[0:2], 4)  // version
+	binary.BigEndian.PutUint16(open[0:2], 4) // version
 	binary.BigEndian.PutUint16(open[2:4], uint16(s.LocalASN))
 	binary.BigEndian.PutUint16(open[4:6], uint16(s.keepalive/time.Second))
 	rid := s.RouterID.As4()
 	copy(open[6:10], rid[:])
-	open[10] = 1  // optional parameter: capability
-	open[11] = 0  // one option
-	open[12] = 4  // capability code 4 = multiprotocol
-	open[13] = 6  // capability length
+	open[10] = 1                               // optional parameter: capability
+	open[11] = 0                               // one option
+	open[12] = 4                               // capability code 4 = multiprotocol
+	open[13] = 6                               // capability length
 	binary.BigEndian.PutUint16(open[14:16], 1) // AFI IPv4
 
 	if err := s.write(msgOpen, open); err != nil {
