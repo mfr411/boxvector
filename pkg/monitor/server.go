@@ -21,6 +21,10 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AppName is the label shown in the UI and the browser title. Keep it neutral so a device owner looking at the
+// panel does not read a product name; the binary/package may still be called boxvector.
+const AppName = "monitoring"
+
 //go:embed templates/*.html
 var tplFS embed.FS
 
@@ -382,7 +386,16 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
+var navTitles = map[string]string{"devices": "Devices", "releases": "Releases", "enroll": "Enroll", "account": "Account", "login": "Sign in"}
+
 func (s *Server) render(w http.ResponseWriter, name string, data any) {
+	if m, ok := data.(map[string]any); ok {
+		if t, ok := m["T"]; !ok || t == "" {
+			if n, ok := m["Nav"].(string); ok {
+				m["T"] = navTitles[n]
+			}
+		}
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := s.tpl.ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, "template error", 500)
