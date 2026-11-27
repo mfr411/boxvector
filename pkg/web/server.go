@@ -123,7 +123,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "terminal"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -136,6 +136,8 @@ func Serve(opt Options) error {
 	mux.HandleFunc("GET /{$}", s.authed(s.peersPage))
 	mux.HandleFunc("GET /interfaces", s.authed(s.ifacesPage))
 	mux.HandleFunc("GET /api/ifaces", s.authed(s.ifacesAPI))
+	mux.HandleFunc("GET /vpp", s.authed(s.vppPage))
+	mux.HandleFunc("GET /api/vpp", s.authed(s.vppAPI))
 	mux.HandleFunc("GET /api/status", s.authed(s.statusAPI))
 	mux.HandleFunc("GET /peers/new", s.authed(s.peerNewPage))
 	mux.HandleFunc("POST /peers/new", s.authed(s.peerNewPost))
@@ -207,11 +209,13 @@ type ctxPage struct {
 	CSRF    string
 	Router  routerInfo
 	Version string
+	VPP     bool
 	Data    any
 }
 
 func (s *server) render(w http.ResponseWriter, name string, p ctxPage) {
 	p.Router = s.router()
+	p.VPP = vppInstalled()
 	if p.Version == "" {
 		_, v, err := bird.RunCommand("show status", p.Router.Socket)
 		if err == nil {

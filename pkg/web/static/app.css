@@ -378,3 +378,5 @@ button.ib.on,button.ib[aria-pressed=true]{background:#e8eefb;border-color:#9db4e
 .rawta:focus{outline:0;border-color:#9db4e6}
 .tools{flex-wrap:wrap;row-gap:6px}.tools .btn,.tools button{white-space:nowrap}.fbar{flex-wrap:wrap}.fbar .pri,.fbar #fclr{white-space:nowrap;height:25px}
 tr.cfg.dis td{color:#888}.cmt{margin-left:6px}#rtb[hidden]{display:none}
+.vh{margin:14px 0 6px;font-size:13px;font-weight:600;color:#333}
+#vth,#vif,#vlc,#vbf{table-layout:auto;width:100%;min-width:0}.vh+.tw{overflow-x:auto}

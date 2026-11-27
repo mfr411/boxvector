@@ -6,6 +6,7 @@ if [ "$1" = configure ]; then
       --shell /usr/sbin/nologin --quiet boxvector
   fi
   getent group bird >/dev/null && adduser --quiet boxvector bird || true
+  getent group vpp >/dev/null && adduser --quiet boxvector vpp || true
   install -d -o boxvector -g boxvector -m 0750 /etc/boxvector /var/lib/boxvector /var/lib/boxvector/cache
   # HTTPS for the web UI: generate a self-signed certificate once; a certificate you install yourself is never replaced
   if [ ! -s /etc/boxvector/tls/web.crt ] || [ ! -s /etc/boxvector/tls/web.key ]; then
