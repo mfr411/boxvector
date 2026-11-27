@@ -23,6 +23,7 @@ var (
 	webTrustProxy bool
 	webAllowAny   bool
 	webTermSock   string
+	webNetSock    string
 	webTermInsec  bool
 )
 
@@ -34,6 +35,7 @@ func init() {
 	webCmd.Flags().BoolVar(&webTrustProxy, "trust-proxy", false, "trust X-Forwarded-For/Proto from a reverse proxy")
 	webCmd.Flags().BoolVar(&webFileAuth, "file-auth", false, "sign in with --auth-file users (bcrypt) instead of the server accounts")
 	webCmd.Flags().BoolVar(&webAllowAny, "allow-public", true, "allow listening on a non-loopback address without TLS")
+	webCmd.Flags().StringVar(&webNetSock, "net-socket", "/run/boxvector-net.sock", "root network helper socket")
 	webCmd.Flags().StringVar(&webTermSock, "terminal-socket", "/run/boxvector-term.sock", "root terminal helper socket")
 	webCmd.Flags().BoolVar(&webTermInsec, "terminal-insecure", false, "allow the root terminal over plain HTTP (default: HTTPS or localhost only)")
 	webCmd.PersistentFlags().StringVar(&webAuthFile, "auth-file", "/etc/boxvector/web.users", "user file (user:bcrypt per line, mode 600)")
@@ -63,7 +65,7 @@ var webCmd = &cobra.Command{
 		err = web.Serve(web.Options{
 			Listen: webListen, ConfigFile: configFile, AuthFile: webAuthFile, StateDir: webStateDir,
 			TLSCert: webTLSCert, TLSKey: webTLSKey, TrustProxy: webTrustProxy, SystemAuth: !webFileAuth,
-			TermSocket: webTermSock, TermInsecure: webTermInsec,
+			TermSocket: webTermSock, NetSocket: webNetSock, TermInsecure: webTermInsec,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -105,7 +107,17 @@ var webPasswdCmd = &cobra.Command{
 	},
 }
 
-var termSock string
+var termSock, netSock string
+
+var webNetCmd = &cobra.Command{
+	Use:   "net-helper",
+	Short: "Run the root network helper used by the web UI (needs root)",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := web.RunNetHelper(netSock); err != nil {
+			log.Fatal(err)
+		}
+	},
+}
 
 var webTermCmd = &cobra.Command{
 	Use:   "term-helper",
@@ -119,5 +131,6 @@ var webTermCmd = &cobra.Command{
 
 func init() {
 	webTermCmd.Flags().StringVar(&termSock, "socket", "/run/boxvector-term.sock", "unix socket to listen on")
-	rootCmd.AddCommand(webTermCmd)
+	webNetCmd.Flags().StringVar(&netSock, "socket", "/run/boxvector-net.sock", "unix socket to listen on")
+	rootCmd.AddCommand(webTermCmd, webNetCmd)
 }

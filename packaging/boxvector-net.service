@@ -1,0 +1,31 @@
+[Unit]
+Description=boxvector root network helper
+Documentation=https://github.com/mfr411/boxvector
+After=network.target
+PartOf=boxvector-web.service
+
+[Service]
+Type=simple
+# Root helper for the web UI's network editing. It accepts only structured, validated operations
+# on a socket that root and group boxvector can open; the caller is authenticated (root/sudo) and logged.
+ExecStart=/usr/bin/boxvector net-helper --socket /run/boxvector-net.sock
+Restart=on-failure
+RestartSec=3
+StateDirectory=boxvector-net
+StateDirectoryMode=0700
+UMask=0077
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_CHOWN
+AmbientCapabilities=CAP_NET_ADMIN CAP_CHOWN
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

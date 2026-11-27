@@ -1,0 +1,18 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>{{.Title}}</h2></div>
+{{if eq .Mode "done"}}<p class="w">Done: <b>{{.Done}}</b></p><div class="w act"><a class="btn pri" href="/routes?v=kernel">Close</a></div>
+{{else}}{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<form class="frm" method="post" action="/kroutes/{{if eq .Mode "new"}}new{{else if eq .Mode "comment"}}comment{{else}}act{{end}}"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+{{if eq .Mode "new"}}<label>Dst. address<input name="dst" value="{{index .F "dst"}}" required maxlength="49" placeholder="192.0.2.0/24" autocomplete="off"></label>
+<label>Gateway<input name="via" value="{{index .F "via"}}" maxlength="45" placeholder="203.0.113.1" autocomplete="off"></label>
+<label>Interface<input name="dev" value="{{index .F "dev"}}" maxlength="15" placeholder="optional if gateway is set" autocomplete="off"></label>
+<label>Metric<input name="metric" value="{{index .F "metric"}}" inputmode="numeric" maxlength="6" placeholder="default" autocomplete="off"></label>
+<label class="w">Comment<input name="comment" value="{{index .F "comment"}}" maxlength="80" placeholder="optional" autocomplete="off"></label>
+<p class="w s">Applied to the kernel immediately and re-applied after a reboot.</p>
+{{else}}<input type="hidden" name="dst" value="{{index .F "dst"}}"><input type="hidden" name="via" value="{{index .F "via"}}"><input type="hidden" name="dev" value="{{index .F "dev"}}"><input type="hidden" name="metric" value="{{index .F "metric"}}"><input type="hidden" name="do" value="{{index .F "do"}}">
+{{if eq .Mode "comment"}}<label class="w">Comment for <b>{{index .F "dst"}}</b><input name="comment" value="{{index .F "comment"}}" maxlength="80" autocomplete="off" placeholder="empty removes the comment"></label>
+{{else}}<p class="w">{{.Text}}</p><p class="w mono"><b>{{index .F "dst"}}</b>{{if index .F "via"}} via {{index .F "via"}}{{end}}{{if index .F "dev"}} dev {{index .F "dev"}}{{end}}</p>
+{{if .Force}}<label class="w"><input type="checkbox" name="force" value="1"> I understand this may cut my own session, do it anyway</label>{{end}}{{end}}{{end}}
+<div class="w act"><a class="btn" href="/routes?v=kernel">Cancel</a><button class="pri{{if .Danger}} dng{{end}}">{{if eq .Mode "act"}}Apply{{else if eq .Mode "new"}}Add{{else}}Save{{end}}</button></div>
+</form>{{end}}
+{{end}}{{end}}

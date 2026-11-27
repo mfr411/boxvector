@@ -35,6 +35,7 @@ type Options struct {
 	TrustProxy   bool
 	Version      string
 	TermSocket   string // root terminal helper socket
+	NetSocket    string // root network helper socket
 	TermInsecure bool   // allow the terminal over plain HTTP
 	SystemAuth   bool   // sign in with the server's own accounts (root / sudo group)
 }
@@ -123,7 +124,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal", "kroute"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -162,6 +163,12 @@ func Serve(opt Options) error {
 	mux.HandleFunc("GET /routes/comment", s.authed(s.routeCommentPage))
 	mux.HandleFunc("POST /routes/comment", s.authed(s.routeCommentPost))
 	mux.HandleFunc("GET /logs", s.authed(s.logsPage))
+	mux.HandleFunc("GET /kroutes/new", s.authed(s.kRouteNewPage))
+	mux.HandleFunc("POST /kroutes/new", s.authed(s.kRouteNewPost))
+	mux.HandleFunc("GET /kroutes/act", s.authed(s.kRouteActPage))
+	mux.HandleFunc("POST /kroutes/act", s.authed(s.kRouteActPost))
+	mux.HandleFunc("GET /kroutes/comment", s.authed(s.kRouteCommentPage))
+	mux.HandleFunc("POST /kroutes/comment", s.authed(s.kRouteCommentPost))
 	mux.HandleFunc("GET /terminal", s.authed(s.termPage))
 	mux.HandleFunc("POST /term/new", s.authed(s.termNew))
 	mux.HandleFunc("GET /term/out", s.authed(s.termOut))
@@ -862,7 +869,7 @@ func (s *server) routesPage(w http.ResponseWriter, r *http.Request, sess *sessio
 		if err != nil {
 			d["TblErr"] = "ip route: " + err.Error()
 		}
-		all, tot = rows, n
+		all, tot = s.mergeKernel(rows), n
 	} else {
 		for _, tb := range []string{"master4", "master6"} {
 			rows, n, err := birdRoutes(s.router().Socket, tb)

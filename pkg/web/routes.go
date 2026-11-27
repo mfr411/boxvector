@@ -17,6 +17,8 @@ type routeRow struct {
 	Prefix, Type, Source, Since, Pref, Via, Dev, Table string
 	Cfg, Off                                           bool // defined in kernel.static-routes / disabled there
 	Comment                                            string
+	K                                                  bool   // editable kernel route
+	Metric                                             uint32 // kernel metric
 }
 
 var (
