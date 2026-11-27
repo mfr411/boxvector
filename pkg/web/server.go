@@ -132,6 +132,8 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /peers/new", s.authed(s.peerNewPost))
 	mux.HandleFunc("GET /config", s.authed(s.configPage))
 	mux.HandleFunc("POST /config/review", s.authed(s.reviewPost))
+	mux.HandleFunc("GET /peers/edit", s.authed(s.peerEditPage))
+	mux.HandleFunc("POST /peers/edit", s.authed(s.peerEditPost))
 	mux.HandleFunc("POST /config/apply", s.authed(s.applyPost))
 	mux.HandleFunc("POST /config/restore", s.authed(s.restorePost))
 	mux.HandleFunc("GET /routes", s.authed(s.routesPage))
@@ -375,39 +377,206 @@ func (s *server) peerNewPage(w http.ResponseWriter, r *http.Request, sess *sessi
 	s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: peerFormData(nil, "")})
 }
 
-func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *session) {
+func formFromRequest(r *http.Request) map[string]string {
 	f := map[string]string{}
 	for _, k := range append([]string{"name", "asn", "neighbors", "description", "template", "limit4", "limit6", "asset"}, ruleKeys()...) {
 		f[k] = strings.TrimSpace(r.PostFormValue(k))
 	}
+	return f
+}
+
+func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *session) {
+	f := formFromRequest(r)
 	fail := func(msg string) {
 		s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: peerFormData(f, msg)})
 	}
-	if !reName.MatchString(f["name"]) {
-		fail("Name: letters, digits, space, dot, dash or underscore (max 64).")
+	peer, msg := buildPeer(f)
+	if msg != "" {
+		fail(msg)
 		return
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		fail("Read config: " + err.Error())
+		return
+	}
+	cand, err := insertPeer(cur, f["name"], peer)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	s.review(w, sess, cur, cand, "Add peer "+f["name"])
+}
+
+// ---- edit peer ----
+
+func findPeers(root *yaml.Node) *yaml.Node {
+	if len(root.Content) == 0 || root.Content[0].Kind != yaml.MappingNode {
+		return nil
+	}
+	top := root.Content[0]
+	for i := 0; i+1 < len(top.Content); i += 2 {
+		if top.Content[i].Value == "peers" && top.Content[i+1].Kind == yaml.MappingNode {
+			return top.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func findPeer(root *yaml.Node, name string) *yaml.Node {
+	ps := findPeers(root)
+	if ps == nil {
+		return nil
+	}
+	for i := 0; i+1 < len(ps.Content); i += 2 {
+		if ps.Content[i].Value == name && ps.Content[i+1].Kind == yaml.MappingNode {
+			return ps.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// formFromPeer turns an existing peer node into form values.
+func formFromPeer(name string, n *yaml.Node) map[string]string {
+	f := map[string]string{"name": name}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		k, v := n.Content[i].Value, n.Content[i+1]
+		switch k {
+		case "asn":
+			f["asn"] = v.Value
+		case "description":
+			f["description"] = v.Value
+		case "template":
+			f["template"] = v.Value
+		case "as-set":
+			f["asset"] = v.Value
+		case "import-limit4":
+			f["limit4"] = v.Value
+		case "import-limit6":
+			f["limit6"] = v.Value
+		case "neighbors":
+			var l []string
+			for _, c := range v.Content {
+				l = append(l, c.Value)
+			}
+			f["neighbors"] = strings.Join(l, ", ")
+		default:
+			for _, rd := range peerRules {
+				if rd.Key == k {
+					if v.Value == "true" {
+						f["r_"+k] = "on"
+					} else if v.Value == "false" {
+						f["r_"+k] = "off"
+					}
+				}
+			}
+		}
+	}
+	return f
+}
+
+func editFormData(f map[string]string, msg string) map[string]any {
+	d := peerFormData(f, msg)
+	d["Edit"] = true
+	return d
+}
+
+func (s *server) peerEditPage(w http.ResponseWriter, r *http.Request, sess *session) {
+	name := r.URL.Query().Get("name")
+	page := func(d map[string]any) {
+		s.render(w, "peer_new", ctxPage{Title: "Edit peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: d})
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		page(editFormData(map[string]string{"name": name}, "Read config: "+err.Error()))
+		return
+	}
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(cur), &root); err != nil {
+		page(editFormData(map[string]string{"name": name}, "Current config is not valid YAML: "+err.Error()))
+		return
+	}
+	n := findPeer(&root, name)
+	if n == nil {
+		page(editFormData(map[string]string{"name": name}, "Peer "+name+" is not defined in "+s.opt.ConfigFile+" (it may come from a template or another file)."))
+		return
+	}
+	page(editFormData(formFromPeer(name, n), ""))
+}
+
+func (s *server) peerEditPost(w http.ResponseWriter, r *http.Request, sess *session) {
+	f := formFromRequest(r)
+	fail := func(msg string) {
+		s.render(w, "peer_new", ctxPage{Title: "Edit peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: editFormData(f, msg)})
+	}
+	peer, msg := buildPeer(f)
+	if msg != "" {
+		fail(msg)
+		return
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		fail("Read config: " + err.Error())
+		return
+	}
+	cand, err := replacePeer(cur, f["name"], peer)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	s.review(w, sess, cur, cand, "Edit peer "+f["name"])
+}
+
+// replacePeer updates the form-managed keys of an existing peer in place and keeps every other key.
+func replacePeer(doc, name string, peer *yaml.Node) (string, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(doc), &root); err != nil {
+		return "", fmt.Errorf("current config is not valid YAML: %w", err)
+	}
+	old := findPeer(&root, name)
+	if old == nil {
+		return "", fmt.Errorf("peer %q is not defined in the config file", name)
+	}
+	managed := formKeys()
+	var kept []*yaml.Node
+	for i := 0; i+1 < len(old.Content); i += 2 {
+		if !managed[old.Content[i].Value] {
+			kept = append(kept, old.Content[i], old.Content[i+1])
+		}
+	}
+	old.Content = append(append([]*yaml.Node{}, peer.Content...), kept...)
+	var b strings.Builder
+	enc := yaml.NewEncoder(&b)
+	enc.SetIndent(2)
+	if err := enc.Encode(&root); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+// buildPeer validates the form values and returns the YAML node for the peer.
+// On a validation problem it returns a message for the user.
+func buildPeer(f map[string]string) (*yaml.Node, string) {
+	if !reName.MatchString(f["name"]) {
+		return nil, "Name: letters, digits, space, dot, dash or underscore (max 64)."
 	}
 	asn, err := strconv.ParseUint(strings.TrimPrefix(strings.ToUpper(f["asn"]), "AS"), 10, 32)
 	if err != nil || asn == 0 {
-		fail("ASN must be a number between 1 and 4294967295.")
-		return
+		return nil, "ASN must be a number between 1 and 4294967295."
 	}
 	var neigh []string
 	for _, n := range strings.FieldsFunc(f["neighbors"], func(r rune) bool { return r == ',' || r == ' ' || r == '\n' || r == '\r' }) {
 		a, err := netip.ParseAddr(n)
 		if err != nil {
-			fail("Neighbor " + n + " is not an IP address.")
-			return
+			return nil, "Neighbor " + n + " is not an IP address."
 		}
 		neigh = append(neigh, a.String())
 	}
 	if len(neigh) == 0 {
-		fail("At least one neighbor IP is required.")
-		return
+		return nil, "At least one neighbor IP is required."
 	}
 	if len(f["description"]) > 120 || strings.ContainsAny(f["description"], "\"\n\r") {
-		fail("Description: max 120 characters, no double quotes.")
-		return
+		return nil, "Description: max 120 characters, no double quotes."
 	}
 	peer := yaml.Node{Kind: yaml.MappingNode}
 	add := func(k string, v *yaml.Node) {
@@ -416,8 +585,7 @@ func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *sessi
 	scalar := func(v string, tag string) *yaml.Node { return &yaml.Node{Kind: yaml.ScalarNode, Value: v, Tag: tag} }
 	if f["template"] != "" {
 		if !reName.MatchString(f["template"]) {
-			fail("Invalid template name.")
-			return
+			return nil, "Invalid template name."
 		}
 		add("template", scalar(f["template"], "!!str"))
 	}
@@ -427,8 +595,7 @@ func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *sessi
 	}
 	if f["asset"] != "" {
 		if !regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9:_.\-]{0,127}$`).MatchString(f["asset"]) {
-			fail("Invalid AS-SET.")
-			return
+			return nil, "Invalid AS-SET."
 		}
 		add("as-set", scalar(f["asset"], "!!str"))
 	}
@@ -436,8 +603,7 @@ func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *sessi
 		if f[l] != "" {
 			n, err := strconv.Atoi(f[l])
 			if err != nil || n < 1 || n > 5_000_000 {
-				fail("Import limits must be between 1 and 5,000,000.")
-				return
+				return nil, "Import limits must be between 1 and 5,000,000."
 			}
 			add("import-"+l, scalar(strconv.Itoa(n), "!!int"))
 		}
@@ -450,8 +616,7 @@ func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *sessi
 		case "off":
 			add(rd.Key, scalar("false", "!!bool"))
 		default:
-			fail("Invalid value for " + rd.Label + ".")
-			return
+			return nil, "Invalid value for " + rd.Label + "."
 		}
 	}
 	nl := &yaml.Node{Kind: yaml.SequenceNode}
@@ -459,18 +624,16 @@ func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *sessi
 		nl.Content = append(nl.Content, scalar(n, "!!str"))
 	}
 	add("neighbors", nl)
+	return &peer, ""
+}
 
-	cur, err := s.store.current()
-	if err != nil {
-		fail("Read config: " + err.Error())
-		return
+// formKeys are the peer keys the form manages; everything else in a peer is left untouched on edit.
+func formKeys() map[string]bool {
+	m := map[string]bool{"template": true, "asn": true, "description": true, "as-set": true, "import-limit4": true, "import-limit6": true, "neighbors": true}
+	for _, r := range peerRules {
+		m[r.Key] = true
 	}
-	cand, err := insertPeer(cur, f["name"], &peer)
-	if err != nil {
-		fail(err.Error())
-		return
-	}
-	s.review(w, sess, cur, cand, "Add peer "+f["name"])
+	return m
 }
 
 // insertPeer adds a peer under "peers:" keeping the rest of the document.

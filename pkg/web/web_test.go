@@ -122,3 +122,29 @@ func TestSessionsSurviveRestart(t *testing.T) {
 		t.Fatal("session lost after restart")
 	}
 }
+
+func TestReplacePeerKeepsUnmanagedKeys(t *testing.T) {
+	doc := "peers:\n  A:\n    asn: 65001\n    neighbors:\n      - 192.0.2.1\n    prepends: 2\n    filter-rpki: false\n  B:\n    asn: 65002\n    neighbors:\n      - 192.0.2.2\n"
+	f := map[string]string{"name": "A", "asn": "65009", "neighbors": "192.0.2.5, 2001:db8::1", "r_filter-rpki": "inherit", "r_strict-rpki": "on"}
+	p, msg := buildPeer(f)
+	if msg != "" {
+		t.Fatal(msg)
+	}
+	out, err := replacePeer(doc, "A", p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"asn: 65009", "192.0.2.5", "2001:db8::1", "prepends: 2", "strict-rpki: true", "asn: 65002", "192.0.2.2"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	for _, bad := range []string{"65001", "192.0.2.1\n", "filter-rpki: false"} {
+		if strings.Contains(out, bad) {
+			t.Errorf("stale %q in:\n%s", bad, out)
+		}
+	}
+	if _, err := replacePeer(doc, "Z", p); err == nil {
+		t.Error("expected error for unknown peer")
+	}
+}

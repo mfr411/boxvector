@@ -1,8 +1,8 @@
 {{define "body"}}{{with .Data}}
-<div class="bar"><h2>Add peer</h2></div>
+<div class="bar"><h2>{{if .Edit}}Edit peer{{else}}Add peer{{end}}</h2></div>
 {{if .Err}}<p class="err">{{.Err}}</p>{{end}}
-<form class="frm" method="post" action="/peers/new"><input type="hidden" name="csrf" value="{{$.CSRF}}">
-<label>Name<input name="name" value="{{index .F "name"}}" required maxlength="64" placeholder="Example Networks"></label>
+<form class="frm" method="post" action="{{if .Edit}}/peers/edit{{else}}/peers/new{{end}}"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<label>Name<input name="name" value="{{index .F "name"}}" required maxlength="64" placeholder="Example Networks"{{if .Edit}} readonly class="ro" title="The name is the peer key and cannot be changed"{{end}}></label>
 <label>ASN<input name="asn" value="{{index .F "asn"}}" required inputmode="numeric" placeholder="65510"></label>
 <label class="w">Neighbors<textarea name="neighbors" rows="2" required placeholder="203.0.113.1, 2001:db8::1">{{index .F "neighbors"}}</textarea></label>
 <label class="w">Description<input name="description" value="{{index .F "description"}}" maxlength="120"></label>

@@ -14,9 +14,10 @@ tb.addEventListener('click',function(e){var tr=e.target.closest('tr');if(!tr||!t
 function close_(){ov.classList.remove('on');win.classList.remove('inactive')}
 function show(r){var d=r.dataset,fam=d.nb.indexOf(':')>=0?'IPv6':'IPv4';
   var rows=[['Peer',d.nm],['Protocol',d.n],['Neighbor',d.nb],['Family',fam],['Remote AS','AS'+d.as],['State',d.st],['Imported routes',num(d.im)],['Exported routes',num(d.ex)],['Since',d.since||'-']];
-  dlg.innerHTML='<div class="wt">Peer &lt;'+esc(d.nm)+' '+fam+'&gt;<b id="dx">✕</b></div><div class="bd"><div class="bl"><div class="dtabs"><span class="on">General</span></div><div class="pn" style="height:auto;min-height:260px"><div class="ifg">'+rows.map(function(a){return '<span class="k">'+a[0]+'</span><span class="v">'+esc(a[1])+'</span>'}).join('')+'</div></div></div><div class="br"><button id="dok">OK</button></div></div><div class="ds"><span>'+(d.up==='1'?'established':'not established')+'</span><span style="margin-left:auto">live from bird · read-only</span></div>';
+  dlg.innerHTML='<div class="wt">Peer &lt;'+esc(d.nm)+' '+fam+'&gt;<b id="dx">✕</b></div><div class="bd"><div class="bl"><div class="dtabs"><span class="on">General</span></div><div class="pn" style="height:auto;min-height:260px"><div class="ifg">'+rows.map(function(a){return '<span class="k">'+a[0]+'</span><span class="v">'+esc(a[1])+'</span>'}).join('')+'</div></div></div><div class="br"><button id="dok">OK</button><button id="ded" class="pri">Edit</button></div></div><div class="ds"><span>'+(d.up==='1'?'established':'not established')+'</span><span style="margin-left:auto">live from bird · read-only</span></div>';
   ov.classList.add('on');win.classList.add('inactive');
-  document.getElementById('dx').onclick=document.getElementById('dok').onclick=close_}
+  document.getElementById('dx').onclick=document.getElementById('dok').onclick=close_;
+  document.getElementById('ded').onclick=function(){close_();if(window.bvEditPeer)window.bvEditPeer(d.nm)}}
 tb.addEventListener('dblclick',function(e){var tr=e.target.closest('tr');if(tr&&tr.dataset.n)show(tr)});
 document.addEventListener('keydown',function(e){if(e.key==='Escape')close_()});
 ov.addEventListener('mousedown',function(e){if(e.target===ov)close_()});

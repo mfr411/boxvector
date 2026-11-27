@@ -256,3 +256,4 @@ body.rzing{cursor:col-resize;user-select:none}
 .fwb pre.out,.fwb pre.diff{white-space:pre-wrap;word-break:break-word;max-height:200px}
 .fwb pre.diff span{display:inline}
 .fwb .frm>.act{position:sticky;bottom:-14px;background:#f4f5f8;margin:6px -16px -14px;padding:10px 16px;border-top:1px solid #d3d6de;z-index:3}
+input.ro{background:#eceef3;color:#666}
