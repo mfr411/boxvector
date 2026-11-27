@@ -2,8 +2,10 @@ package cmd
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -53,9 +55,7 @@ var monitorPasswdCmd = &cobra.Command{
 	Short: "Create a monitor admin or change its password",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Fprint(os.Stderr, "Password: ")
-		b, err := term.ReadPassword(int(os.Stdin.Fd()))
-		fmt.Fprintln(os.Stderr)
+		b, err := readPassword()
 		if err != nil || len(b) < 10 {
 			log.Fatal("password must be at least 10 characters")
 		}
@@ -65,6 +65,18 @@ var monitorPasswdCmd = &cobra.Command{
 		}
 		fmt.Println("saved")
 	},
+}
+
+// readPassword prompts on a tty, but also accepts a pipe so `echo pw | boxvector monitor passwd u` works.
+func readPassword() ([]byte, error) {
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprint(os.Stderr, "Password: ")
+		b, err := term.ReadPassword(int(os.Stdin.Fd()))
+		fmt.Fprintln(os.Stderr)
+		return b, err
+	}
+	b, err := io.ReadAll(os.Stdin)
+	return []byte(strings.TrimSpace(string(b))), err
 }
 
 var agentCmd = &cobra.Command{Use: "agent", Short: "Heartbeat agent for the central monitor"}

@@ -16,6 +16,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -293,7 +294,22 @@ func SetPassword(file, user, pw string) error {
 	if err := os.WriteFile(tmp, []byte(strings.Join(out, "\n")+"\n"), 0o640); err != nil {
 		return err
 	}
-	return os.Rename(tmp, file)
+	if err := os.Rename(tmp, file); err != nil {
+		return err
+	}
+	// the service runs as a dedicated user; if this CLI ran as root the file would otherwise
+	// become root-owned and the service could no longer read it (it must stay readable + writable by the dir owner)
+	if di, err := os.Stat(filepath.Dir(file)); err == nil {
+		fi, err := os.Stat(file)
+		if err == nil {
+			ds, okd := di.Sys().(*syscall.Stat_t)
+			fs, okf := fi.Sys().(*syscall.Stat_t)
+			if okd && okf && ds.Uid != fs.Uid {
+				_ = os.Chown(file, int(ds.Uid), int(ds.Gid))
+			}
+		}
+	}
+	return nil
 }
 
 func rnd() string {
