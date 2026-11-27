@@ -57,8 +57,20 @@ sudo bash install.sh --mode core     # boxvector + BIRD only
 | `--bird 2\|3\|keep` | BIRD major version (default 2; 3 adds the CZ.NIC repository) |
 | `--vpp-nic 0000:03:00.0` | add a DPDK NIC to VPP. Refused while the NIC is still a kernel interface, so a remote session is not cut |
 | `--web-user NAME` | web UI admin name (default `admin`). Password is random and shown once, or set `BOXVECTOR_WEB_PASSWORD` |
+| `--vpp-nic PCI` (repeatable) | each NIC gets one RX/TX queue per worker, so RSS spreads flows over all cores |
+| `--vpp-reserve N`, `--vpp-smt`, `--vpp-workers N` | physical cores kept for OS/BIRD (default 1) / also use hyper-threads / cap the worker count |
+| `--no-os-tune`, `--no-boxvector` | skip governor and CPUAffinity changes / keep the installed boxvector |
 | `--version X.Y.Z`, `--deb FILE\|URL` | pick a release or a local package |
 | `--dry-run`, `--yes` | preview only / no questions |
+
+**CPU tuning.** The installer reads the CPU topology and gives VPP every
+core except the reserved ones: `main-core` and the OS/BIRD/boxvector stay on
+the first physical core, all other physical cores of the NIC's NUMA node become
+VPP workers (cores on another NUMA node are not used, they would cross the
+interconnect). Hugepages, buffers, heap and `statseg` are sized from the
+worker count and RAM. The CPU governor is set to `performance` and systemd
+`CPUAffinity` keeps other services on the reserved cores (reboot once to apply).
+The chosen plan is written at the top of `/etc/vpp/startup.conf` and printed at the end.
 
 VPP comes from the fd.io repository (`packagecloud.io/fdio/release`). The
 installer writes `/etc/vpp/startup.conf` with the `linux_cp` and `linux_nl`

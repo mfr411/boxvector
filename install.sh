@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="mfr411/boxvector"
 MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; VERSION="latest"
-WEB_USER="admin"; VPP_NIC=""; ASSUME_YES=0; DRY=0; FORCE=0
+WEB_USER="admin"; NO_BV=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0
 VPP_REPO_KEY=/usr/share/keyrings/fdio-release.gpg
 BIRD3_KEY=/usr/share/keyrings/cznic-labs-pkg.gpg
 
@@ -33,7 +33,12 @@ boxvector installer
   --bird 2|3|keep          BIRD major to install (default 2; keep = leave what is installed)
   --vpp / --no-vpp         (custom) install VPP + linux-cp
   --web / --no-web         (custom) enable web UI and create the admin user
-  --vpp-nic PCI_ADDR       add a DPDK NIC to VPP, e.g. 0000:03:00.0 (must already be bound to vfio-pci/uio)
+  --vpp-nic PCI_ADDR       add a DPDK NIC to VPP, e.g. 0000:03:00.0 (repeatable; must already be bound to vfio-pci/uio)
+  --vpp-reserve N          physical cores kept for the OS + BIRD + boxvector (default 1)
+  --vpp-smt                also use hyper-thread siblings as VPP workers (default: physical cores only)
+  --vpp-workers N          cap the number of VPP workers (default: all remaining cores of the NIC's NUMA node)
+  --no-boxvector           keep the installed boxvector package as it is
+  --no-os-tune             do not touch CPU governor / systemd CPUAffinity
   --web-user NAME          web UI admin name (default admin); password: $BOXVECTOR_WEB_PASSWORD or random
   --version X.Y.Z          release to install (default latest)
   --deb FILE|URL           install this .deb instead of downloading a release
@@ -50,7 +55,12 @@ while [ $# -gt 0 ]; do
     --bird) BIRD=${2:?}; shift 2 ;;
     --vpp) VPP=1; shift ;;   --no-vpp) VPP=0; shift ;;
     --web) WEB=1; shift ;;   --no-web) WEB=0; shift ;;
-    --vpp-nic) VPP_NIC=${2:?}; shift 2 ;;
+    --vpp-nic) VPP_NICS+=("${2:?}"); shift 2 ;;
+    --vpp-reserve) VPP_RESERVE=${2:?}; shift 2 ;;
+    --vpp-smt) VPP_SMT=1; shift ;;
+    --vpp-workers) VPP_WORKERS=${2:?}; shift 2 ;;
+    --no-os-tune) TUNE_OS=0; shift ;;
+    --no-boxvector) NO_BV=1; shift ;;
     --web-user) WEB_USER=${2:?}; shift 2 ;;
     --version) VERSION=${2:?}; shift 2 ;;
     --deb) DEB=${2:?}; shift 2 ;;
@@ -108,7 +118,7 @@ case "$MODE" in
   *) die "--mode must be all, core or custom" ;;
 esac
 case "$BIRD" in 2|3|keep) ;; *) die "--bird must be 2, 3 or keep" ;; esac
-[ -z "$VPP_NIC" ] || [ "$VPP" = 1 ] || die "--vpp-nic needs VPP (--mode all or --vpp)"
+[ ${#VPP_NICS[@]} -eq 0 ] || [ "$VPP" = 1 ] || die "--vpp-nic needs VPP (--mode all or --vpp)"
 [ "$VPP" = 1 ] && [ "$ARCH" != amd64 ] && warn "VPP packages from fd.io are published for amd64; arm64 may be unavailable"
 
 log "plan: mode=$MODE bird=$BIRD vpp=$VPP web=$WEB os=$PRETTY_NAME arch=$ARCH"
@@ -125,7 +135,7 @@ check_nic() {
   fi
   case "$drv" in vfio-pci|uio_pci_generic|igb_uio) ;; *) [ "$FORCE" = 1 ] || die "$pci uses driver '$drv'; bind it to vfio-pci/uio_pci_generic first" ;; esac
 }
-[ -z "$VPP_NIC" ] || check_nic "$VPP_NIC"
+for n in "${VPP_NICS[@]}"; do check_nic "$n"; done
 
 # ---------- helpers ----------
 export DEBIAN_FRONTEND=noninteractive
@@ -176,7 +186,7 @@ install_vpp() {
   write_vpp_config
   if [ -d /run/systemd/system ] && [ "$DRY" = 0 ]; then
     systemctl enable vpp >/dev/null 2>&1 || true
-    systemctl restart vpp
+    if [ "$VPP_CONF_CHANGED" = 1 ] || ! systemctl is-active --quiet vpp; then systemctl restart vpp; fi
     for _ in $(seq 1 20); do vppctl show version >/dev/null 2>&1 && break; sleep 1; done
     vppctl show version >/dev/null 2>&1 || die "vpp did not come up; see: journalctl -u vpp"
     o=$(vppctl show plugins 2>/dev/null || true); [[ "$o" == *linux_cp* ]] || warn "linux_cp plugin not loaded"
@@ -184,12 +194,89 @@ install_vpp() {
   fi
 }
 
+# Split the CPUs for VPP. Reads lscpu topology; nothing is hardcoded.
+#   reserved : first VPP_RESERVE physical cores (all their threads) -> OS, BIRD, boxvector, VPP main thread
+#   workers  : every other physical core on the NUMA node of the NIC (+ SMT siblings with --vpp-smt)
+# Workers on a NUMA node different from the NIC would cross the interconnect for every packet, so they are not used.
+vpp_cpu_plan() {
+  local node=0 pci topo
+  if [ ${#VPP_NICS[@]} -gt 0 ]; then
+    pci=${VPP_NICS[0]}
+    node=$(cat "/sys/bus/pci/devices/$pci/numa_node" 2>/dev/null || echo 0); [ "$node" -ge 0 ] 2>/dev/null || node=0
+  fi
+  topo=$(lscpu -p=CPU,CORE,SOCKET,NODE 2>/dev/null | grep -v '^#' || true)
+  [ -n "$topo" ] || topo=$(seq 0 $(( $(nproc) - 1 )) | awk '{print $1","$1",0,0"}')
+  # NODE column is empty on some VMs: treat as node 0
+  topo=$(echo "$topo" | awk -F, '{n=($4==""?0:$4); print $1","$2","$3","n}')
+  awk -F, -v node="$node" -v reserve="$VPP_RESERVE" -v smt="$VPP_SMT" -v maxw="${VPP_WORKERS:-0}" '
+    function ranges(a, n,   i, out, st, pv) {
+      out=""; st=a[1]; pv=a[1]
+      for (i=2;i<=n+1;i++) {
+        if (i<=n && a[i]==pv+1) { pv=a[i]; continue }
+        out = out (out==""?"":",") (st==pv ? st : st "-" pv)
+        st=a[i]; pv=a[i]
+      }
+      return out
+    }
+    { cpu=$1; key=$3"/"$2; if (!(key in first)) { first[key]=cpu; order[++nk]=key; cnode[key]=$4 }
+      if (cpu<first[key]) first[key]=cpu
+      thr[key]=thr[key] " " cpu; nodeof[cpu]=$4 }
+    END {
+      # sort physical cores by their first cpu id
+      for (i=1;i<=nk;i++) for (j=i+1;j<=nk;j++) if (first[order[j]]+0 < first[order[i]]+0) { tmp=order[i]; order[i]=order[j]; order[j]=tmp }
+      nres=0; nw=0; ncpu=0
+      for (i=1;i<=nk;i++) { k=order[i]; split(thr[k], t, " ")
+        if (nres < reserve) { nres++; for (x in t) res[++nr]=t[x]; continue }
+        if (cnode[k] != node) continue
+        # t[] order is not guaranteed; pick lowest as the physical thread, the rest are SMT siblings
+        n=0; for (x in t) arr[++n]=t[x]+0
+        for (a=1;a<=n;a++) for (b=a+1;b<=n;b++) if (arr[b]<arr[a]) { v=arr[a]; arr[a]=arr[b]; arr[b]=v }
+        w[++nw]=arr[1]; if (smt==1) for (a=2;a<=n;a++) sib[++ns]=arr[a]
+        delete arr
+      }
+      for (a=1;a<=ns;a++) w[++nw]=sib[a]
+      for (a=1;a<=nw;a++) for (b=a+1;b<=nw;b++) if (w[b]<w[a]) { v=w[a]; w[a]=w[b]; w[b]=v }
+      if (maxw>0 && nw>maxw) nw=maxw
+      for (a=1;a<=nr;a++) for (b=a+1;b<=nr;b++) if (res[b]+0<res[a]+0) { v=res[a]; res[a]=res[b]; res[b]=v }
+      printf "MAIN=%s\nWORKERS=%s\nNW=%d\nRESERVED=%s\n", res[1]+0, (nw>0?ranges(w,nw):""), nw, ranges(res,nr)
+    }' <<<"$topo"
+}
+
 write_vpp_config() {
-  local f=/etc/vpp/startup.conf want sum cores main="" workers=""
-  cores=$(nproc)
-  if [ "$cores" -ge 4 ]; then main="cpu { main-core 1 corelist-workers 2-$((cores>8?4:cores-1)) }"; fi
+  local f=/etc/vpp/startup.conf want cpu_block="" dpdk_block="" plug_dpdk=disable
+  local MAIN="" WORKERS="" NW=0 RESERVED=""
+  eval "$(vpp_cpu_plan)"
+  local ram_mb; ram_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+  local nq=$NW; [ "$nq" -ge 1 ] || nq=1
+  # buffers scale with workers; heap by RAM
+  local buffers=$(( 32768 * nq )); [ "$buffers" -ge 65536 ] || buffers=65536
+  local heap=256; [ "$ram_mb" -ge 3500 ] && heap=512; [ "$ram_mb" -ge 7500 ] && heap=1024; [ "$ram_mb" -ge 15000 ] && heap=2048; [ "$ram_mb" -ge 60000 ] && heap=4096
+  # hugepages (2 MB): buffers*2.3KB + heap + statseg + slack, never more than 40% of RAM
+  local seg=256; [ "$ram_mb" -ge 4000 ] || seg=64
+  local hp_mb=$(( buffers * 24 / 10000 + heap + seg + 128 )); local cap=$(( ram_mb / 2 ))
+  [ "$hp_mb" -le "$cap" ] || { warn "RAM small: trimming VPP buffers to fit 50% of memory"; buffers=$(( (cap - heap - seg - 128) * 10000 / 24 )); hp_mb=$cap; }
+  [ "$buffers" -ge 16384 ] || die "not enough RAM for VPP (${ram_mb} MB)"
+  local hugepages=$(( (hp_mb + 1) / 2 ))
+  if [ -n "$WORKERS" ]; then
+    cpu_block="cpu {
+  main-core $MAIN
+  corelist-workers $WORKERS
+}"
+  else
+    warn "no spare cores for VPP workers (reserve=$VPP_RESERVE): VPP runs single-threaded on the main core"
+    cpu_block="cpu { main-core $MAIN }"
+  fi
+  if [ ${#VPP_NICS[@]} -gt 0 ]; then
+    plug_dpdk=enable
+    dpdk_block=$'dpdk {\n  uio-driver vfio-pci\n  no-multi-seg\n  # each NIC gets one RX/TX queue per worker (RSS spreads flows over all cores)'
+    local n; for n in "${VPP_NICS[@]}"; do
+      dpdk_block+=$'\n'"  dev $n {"$'\n'"    num-rx-queues $nq"$'\n'"    num-tx-queues $nq"$'\n'"    num-rx-desc 2048"$'\n'"    num-tx-desc 2048"$'\n'"  }"
+    done
+    dpdk_block+=$'\n}'
+  fi
   want=$(cat <<EOF
-# managed by boxvector install.sh (edit below the markers only if you re-run with care)
+# managed by boxvector install.sh (re-run the installer to regenerate; manual edits are overwritten)
+# cpu plan: main=$MAIN workers=${WORKERS:-none} ($NW) reserved-for-os=$RESERVED
 unix {
   nodaemon
   log /var/log/vpp/vpp.log
@@ -201,34 +288,75 @@ unix {
 api-trace { on }
 api-segment { gid vpp }
 socksvr { default }
-${main}
-buffers { buffers-per-numa 128000 }
+$cpu_block
+buffers {
+  buffers-per-numa $buffers
+  page-size default-hugepage
+}
+memory { main-heap-size ${heap}M }
+statseg { size ${seg}M }
 plugins {
   plugin default { enable }
   plugin linux_cp_plugin.so { enable }
   plugin linux_nl_plugin.so { enable }
-$( [ -n "$VPP_NIC" ] && echo "  plugin dpdk_plugin.so { enable }" || echo "  plugin dpdk_plugin.so { disable }" )
+  plugin dpdk_plugin.so { $plug_dpdk }
 }
-$( [ -n "$VPP_NIC" ] && printf 'dpdk {\n  dev %s\n}\n' "$VPP_NIC" )
+$dpdk_block
 EOF
 )
-  if [ -f "$f" ] && ! grep -q 'managed by boxvector install.sh' "$f" && [ ! -e "$f.pre-boxvector" ]; then
+  if [ -f "$f" ] && [[ "$(head -1 "$f")" != *"managed by boxvector install.sh"* ]] && [ ! -e "$f.pre-boxvector" ]; then
     run cp -a "$f" "$f.pre-boxvector"
   fi
   local cli=/etc/vpp/boxvector-lcp.cli
   local cli_want=$'# managed by boxvector install.sh: mirror VPP interfaces into Linux (BIRD talks to the Linux side)\nlcp lcp-sync on\nlcp lcp-auto-subint on'
+  VPP_PLAN="main=$MAIN workers=${WORKERS:-none}($NW) os=$RESERVED buffers=$buffers hugepages=${hugepages}x2M heap=${heap}M"
+  log "VPP cpu plan: $VPP_PLAN"
+  tune_os "$hugepages" "$RESERVED" "$WORKERS"
   if [ -f "$f" ] && [ "$(cat "$f")" = "$want" ] && [ -f "$cli" ] && [ "$(cat "$cli")" = "$cli_want" ]; then log "$f already up to date"; return; fi
   log "writing $f"
   [ "$DRY" = 1 ] && return
   install -d -m 0755 /etc/vpp /var/log/vpp
   printf '%s\n' "$cli_want" >"$cli"
   printf '%s\n' "$want" >"$f"
-  # hugepages for DPDK
-  if [ -n "$VPP_NIC" ]; then
-    printf 'vm.nr_hugepages=1024\nvm.max_map_count=3096\nkernel.shmmax=2147483648\n' >/etc/sysctl.d/81-boxvector-vpp.conf
-    sysctl -q --system >/dev/null || true
+  VPP_CONF_CHANGED=1
+}
+
+# Host tuning for a poll-mode forwarder: hugepages, performance governor, keep OS services off the VPP cores.
+tune_os() {
+  local hp=$1 reserved=$2 workers=$3
+  [ "$DRY" = 1 ] && { echo "+ tune_os hugepages=$hp reserved=$reserved"; return; }
+  local sc=/etc/sysctl.d/81-boxvector-vpp.conf sc_want
+  sc_want=$(printf 'vm.nr_hugepages=%s\nvm.max_map_count=%s\nkernel.shmmax=%s\n' "$hp" $(( hp * 4 + 65530 )) $(( hp * 2 * 1024 * 1024 )))
+  if [ "$(cat "$sc" 2>/dev/null)" != "$sc_want" ]; then printf '%s\n' "$sc_want" >"$sc"; sysctl -q -p "$sc" >/dev/null 2>&1 || true; fi
+  local got; got=$(awk '/HugePages_Total/ {print $2}' /proc/meminfo)
+  [ "${got:-0}" -ge "$hp" ] || warn "hugepages: wanted $hp, kernel has ${got:-0} (memory fragmented?). Reboot to get them all."
+  [ "$TUNE_OS" = 1 ] || return 0
+  # performance governor (not available in most VMs: ignored there)
+  if ls /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor >/dev/null 2>&1; then
+    for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance >"$g" 2>/dev/null || true; done
+    cat >/etc/systemd/system/boxvector-cpu-performance.service <<'UNIT'
+[Unit]
+Description=boxvector: CPU governor performance
+After=sysinit.target
+[Service]
+Type=oneshot
+ExecStart=/bin/sh -c 'for g in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo performance > $g; done'
+[Install]
+WantedBy=multi-user.target
+UNIT
+    [ -d /run/systemd/system ] && systemctl enable boxvector-cpu-performance.service >/dev/null 2>&1 || true
+  fi
+  # keep every other service on the reserved cores so they never steal cycles from the polling workers
+  if [ -n "$workers" ] && [ -d /run/systemd/system ]; then
+    install -d /etc/systemd/system.conf.d /etc/systemd/system/vpp.service.d
+    printf '# managed by boxvector install.sh\n[Manager]\nCPUAffinity=%s\n' "$reserved" >/etc/systemd/system.conf.d/boxvector-cpuaffinity.conf
+    # VPP itself pins its threads; give it the full mask so main/workers can move to their cores
+    printf '# managed by boxvector install.sh\n[Service]\nCPUAffinity=\nLimitMEMLOCK=infinity\n' >/etc/systemd/system/vpp.service.d/boxvector.conf
+    systemctl daemon-reload >/dev/null 2>&1 || true
+    REBOOT_HINT=1   # CPUAffinity of PID 1 applies after daemon-reexec/reboot
   fi
 }
+VPP_CONF_CHANGED=0; REBOOT_HINT=0; VPP_PLAN=""
 if [ "$VPP" = 1 ]; then log "VPP"; install_vpp; fi
 
 # ---------- boxvector ----------
@@ -257,10 +385,15 @@ fetch_deb() {
     warn "no SHA256SUMS published for this release; checksum not verified"
   fi
 }
-log "boxvector"
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
-fetch_deb "$tmp/boxvector.deb"
-[ "$DRY" = 1 ] || run $APT install "$tmp/boxvector.deb"
+if [ "$NO_BV" = 1 ]; then
+  pkg_installed boxvector || die "--no-boxvector but boxvector is not installed"
+  log "boxvector kept as installed"
+else
+  log "boxvector"
+  fetch_deb "$tmp/boxvector.deb"
+  [ "$DRY" = 1 ] || run $APT install "$tmp/boxvector.deb"
+fi
 
 # ---------- web UI ----------
 if [ "$WEB" = 1 ]; then
@@ -290,6 +423,8 @@ log "done"
 pkg_installed boxvector && echo "  boxvector : $(boxvector version 2>/dev/null | head -1)"
 command -v bird >/dev/null && echo "  bird      : $(bird --version 2>&1 | head -1)"
 [ "$VPP" = 1 ] && command -v vppctl >/dev/null && echo "  vpp       : $(vppctl show version 2>/dev/null | head -1)"
+[ "$VPP" = 1 ] && echo "  vpp cpu   : $VPP_PLAN"
+[ "$REBOOT_HINT" = 1 ] && echo "  note      : reboot once so systemd CPUAffinity (OS kept on reserved cores) takes effect"
 if [ "$WEB" = 1 ]; then
   echo "  web UI    : https://${ip4:-<server-ip>}:6969  (self-signed certificate)"
   [ -n "${NEWPW:-}" ] && echo "  login     : $WEB_USER / $NEWPW   <- shown once, change it after login"
