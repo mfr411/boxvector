@@ -1,0 +1,14 @@
+[Unit]
+Description=boxvector: re-apply the VPP interface config (vppcfg) after VPP starts
+After=vpp.service
+Requires=vpp.service
+ConditionPathExists=/etc/vpp/boxvector-vppcfg.yaml
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=/bin/sh -c 'for i in $(seq 1 30); do [ -S /run/vpp/api.sock ] && exit 0; sleep 1; done; exit 1'
+ExecStart=/opt/vppcfg-venv/bin/vppcfg apply -c /etc/vpp/boxvector-vppcfg.yaml
+
+[Install]
+WantedBy=multi-user.target

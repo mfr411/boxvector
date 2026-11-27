@@ -39,6 +39,7 @@ if [ "$1" = configure ]; then
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null || true
     systemctl enable --now boxvector-net.service >/dev/null 2>&1 || true
+    systemctl enable boxvector-vppcfg.service >/dev/null 2>&1 || true
     # enrolled devices must keep reporting after a reboot or a stop
     if [ -s /etc/boxvector/agent.json ]; then systemctl enable --now boxvector-agent.service >/dev/null 2>&1 || true; fi
     systemctl try-restart boxvector-net.service boxvector-term.service boxvector-web.service boxvector-agent.service >/dev/null 2>&1 || true
