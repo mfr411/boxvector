@@ -14,7 +14,7 @@
 set -euo pipefail
 
 REPO="mfr411/boxvector"
-MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; VERSION="latest"
+MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; BV_VERSION="latest"
 WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0
 VPP_REPO_KEY=/usr/share/keyrings/fdio-release.gpg
 BIRD3_KEY=/usr/share/keyrings/cznic-labs-pkg.gpg
@@ -65,7 +65,7 @@ while [ $# -gt 0 ]; do
     --no-os-tune) TUNE_OS=0; shift ;;
     --no-boxvector) NO_BV=1; shift ;;
     --web-user) WEB_USER=${2:?}; shift 2 ;;
-    --version) VERSION=${2:?}; shift 2 ;;
+    --version) BV_VERSION=${2:?}; shift 2 ;;
     --deb) DEB=${2:?}; shift 2 ;;
     --yes|-y) ASSUME_YES=1; shift ;;
     --dry-run) DRY=1; shift ;;
@@ -474,11 +474,11 @@ fetch_deb() {
     case "$DEB" in http*://*) run curl -fsSL "$DEB" -o "$out" ;; *) [ -f "$DEB" ] || die "no such file: $DEB"; cp "$DEB" "$out" ;; esac
     return
   fi
-  if [ "$VERSION" = latest ]; then
+  if [ "$BV_VERSION" = latest ]; then
     url=$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
       | grep -oE "https://[^\"]+boxvector_[^\"]+_${ARCH}\.deb" | head -1 || true)
   else
-    url="https://github.com/$REPO/releases/download/v${VERSION#v}/boxvector_${VERSION#v}_${ARCH}.deb"
+    url="https://github.com/$REPO/releases/download/v${BV_VERSION#v}/boxvector_${BV_VERSION#v}_${ARCH}.deb"
   fi
   [ -n "$url" ] || die "no release .deb found for $ARCH. Use --deb FILE|URL (releases: https://github.com/$REPO/releases)"
   log "downloading $url"
