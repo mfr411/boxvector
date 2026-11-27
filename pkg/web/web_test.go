@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mfr411/boxvector/pkg/fleet"
 
 	"gopkg.in/yaml.v3"
 )
@@ -92,26 +91,6 @@ func TestPeerNewTemplateRenders(t *testing.T) {
 		}
 		if strings.Count(b.String(), "<select name=\"r_") != len(peerRules) {
 			t.Errorf("%s: expected %d rule selects", name, len(peerRules))
-		}
-	}
-}
-
-func TestPatchingTemplateRenders(t *testing.T) {
-	funcs := template.FuncMap{"ago": func(tm time.Time) string { return tm.Format("15:04") }}
-	tp := template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/patching.html"))
-	for name, d := range map[string]any{
-		"off": map[string]any{"Enabled": false},
-		"on": map[string]any{"Enabled": true, "Busy": false,
-			"Rows": []fleetRow{{H: fleet.Host{Name: "r1", Addr: "192.0.2.1", Port: 22, User: "bvpatch"},
-				S: fleet.Status{BIRD: "3.4.0", BGPUp: 1, BGPTotal: 2, CheckedAt: time.Now(), Upgradable: []fleet.Pkg{{Name: "bird3", From: "3.4.0", To: "3.4.1", Security: true}}}}},
-			"Jobs": []fleet.Job{{ID: "20261127-1", Kind: "patch", State: "failed", Time: time.Now(), Hosts: []fleet.HostResult{{Name: "r1", State: "failed", Before: map[string]string{"bird3": "3.4.0"}, Log: "x"}}}}},
-	} {
-		var b strings.Builder
-		if err := tp.ExecuteTemplate(&b, "layout", ctxPage{Title: "Patching", Nav: "patching", CSRF: "tok", Data: d}); err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
-		if name == "on" && (!strings.Contains(b.String(), `name="pkg" value="bird3"`) || !strings.Contains(b.String(), "Roll back selected")) {
-			t.Errorf("on page missing controls")
 		}
 	}
 }

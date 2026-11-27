@@ -4,7 +4,6 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
-	"github.com/mfr411/boxvector/pkg/fleet"
 	"html/template"
 	"io/fs"
 	"net/http"
@@ -36,7 +35,6 @@ type Options struct {
 	TrustProxy bool
 	Version    string
 	SystemAuth bool   // sign in with the server's own accounts (root / sudo group)
-	FleetKey   string // SSH private key for centralized patching (empty = feature off)
 }
 
 type server struct {
@@ -44,7 +42,6 @@ type server struct {
 	auth  *auth
 	store *store
 	tpl   map[string]*template.Template
-	fleet *fleet.Manager
 }
 
 // routerInfo is the subset of the boxvector config the UI needs; parsed
@@ -117,14 +114,10 @@ func Serve(opt Options) error {
 		"ago": func(t time.Time) string { return t.Format("02 Jan 15:04:05") },
 		"op":  func(b byte) string { return string(b) },
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "config", "review", "routes", "logs", "patching", "interfaces"} {
+	for _, p := range []string{"login", "peers", "peer_new", "config", "review", "routes", "logs", "interfaces"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
-	if opt.FleetKey != "" {
-		s.fleet = fleet.New(filepath.Join(opt.StateDir, "fleet"), nil)
-		s.fleet.SetRunner(&fleet.SSHRunner{KeyFile: opt.FleetKey, M: s.fleet})
-	}
 
 	static, _ := fs.Sub(assets, "static")
 	mux := http.NewServeMux()
@@ -143,10 +136,6 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /config/restore", s.authed(s.restorePost))
 	mux.HandleFunc("GET /routes", s.authed(s.routesPage))
 	mux.HandleFunc("GET /logs", s.authed(s.logsPage))
-	mux.HandleFunc("GET /patching", s.authed(s.patchingPage))
-	mux.HandleFunc("POST /patching/run", s.authed(s.patchingRun))
-	mux.HandleFunc("POST /patching/hosts", s.authed(s.patchingHosts))
-	mux.HandleFunc("POST /patching/rollback", s.authed(s.patchingRollback))
 
 	srv := &http.Server{
 		Addr:              opt.Listen,

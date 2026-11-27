@@ -31,14 +31,12 @@ func init() {
 	webCmd.Flags().StringVar(&webTLSKey, "tls-key", "", "TLS key file")
 	webCmd.Flags().BoolVar(&webTrustProxy, "trust-proxy", false, "trust X-Forwarded-For/Proto from a reverse proxy")
 	webCmd.Flags().BoolVar(&webFileAuth, "file-auth", false, "sign in with --auth-file users (bcrypt) instead of the server accounts")
-	webCmd.Flags().StringVar(&webFleetKey, "fleet-key", "", "SSH private key (mode 600) enabling centralized Debian/Ubuntu patching of other routers")
 	webCmd.Flags().BoolVar(&webAllowAny, "allow-public", true, "allow listening on a non-loopback address without TLS")
 	webCmd.PersistentFlags().StringVar(&webAuthFile, "auth-file", "/etc/boxvector/web.users", "user file (user:bcrypt per line, mode 600)")
 	webCmd.AddCommand(webPasswdCmd)
 	rootCmd.AddCommand(webCmd)
 }
 
-var webFleetKey string
 var webFileAuth bool
 
 var webCmd = &cobra.Command{
@@ -60,7 +58,7 @@ var webCmd = &cobra.Command{
 		log.Infof("Boxvector web UI on %s (config %s)", webListen, configFile)
 		err = web.Serve(web.Options{
 			Listen: webListen, ConfigFile: configFile, AuthFile: webAuthFile, StateDir: webStateDir,
-			TLSCert: webTLSCert, TLSKey: webTLSKey, TrustProxy: webTrustProxy, FleetKey: webFleetKey, SystemAuth: !webFileAuth,
+			TLSCert: webTLSCert, TLSKey: webTLSKey, TrustProxy: webTrustProxy, SystemAuth: !webFileAuth,
 		})
 		if err != nil {
 			log.Fatal(err)
