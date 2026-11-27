@@ -122,7 +122,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "config", "review", "routes", "logs", "interfaces", "terminal"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "config", "review", "routes", "logs", "interfaces", "terminal"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -144,6 +144,10 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /peers/edit", s.authed(s.peerEditPost))
 	mux.HandleFunc("GET /peers/delete", s.authed(s.peerDeletePage))
 	mux.HandleFunc("POST /peers/delete", s.authed(s.peerDeletePost))
+	mux.HandleFunc("GET /peers/toggle", s.authed(s.peerTogglePage))
+	mux.HandleFunc("POST /peers/toggle", s.authed(s.peerTogglePost))
+	mux.HandleFunc("GET /peers/comment", s.authed(s.peerCommentPage))
+	mux.HandleFunc("POST /peers/comment", s.authed(s.peerCommentPost))
 	mux.HandleFunc("POST /config/apply", s.authed(s.applyPost))
 	mux.HandleFunc("POST /config/restore", s.authed(s.restorePost))
 	mux.HandleFunc("GET /routes", s.authed(s.routesPage))
@@ -272,6 +276,7 @@ func (s *server) logoutPost(w http.ResponseWriter, r *http.Request, _ *session) 
 
 type peerRow struct {
 	Name, Proto, ASN, Neighbor, State, Info, Since, Desc string
+	Off                                                  bool   // disabled in the config file
 	Class                                                string // "", "w", "d"
 	Imported, Exported                                   int
 }
@@ -296,6 +301,7 @@ func (s *server) peersPage(w http.ResponseWriter, r *http.Request, sess *session
 		if b, err := os.ReadFile(filepath.Join(ri.BIRDDir, "protocols.json")); err == nil {
 			_ = json.Unmarshal(b, &names)
 		}
+		cfgPeers := s.peerMeta()
 		states, err := bird.ParseProtocols(out)
 		if err != nil {
 			errMsg = "Parse BIRD output: " + err.Error()
@@ -311,6 +317,9 @@ func (s *server) peersPage(w http.ResponseWriter, r *http.Request, sess *session
 			}
 			if p.Routes != nil {
 				row.Imported, row.Exported = p.Routes.Imported, p.Routes.Exported
+			}
+			if m, ok := cfgPeers[row.Name]; ok {
+				row.Off, row.Desc = m.off, m.desc
 			}
 			switch {
 			case p.Info == "Established":
@@ -406,6 +415,10 @@ func formFromRequest(r *http.Request) map[string]string {
 }
 
 func (s *server) peerNewPost(w http.ResponseWriter, r *http.Request, sess *session) {
+	if r.PostFormValue("mode") == "raw" {
+		s.peerNewRaw(w, r, sess)
+		return
+	}
 	f := formFromRequest(r)
 	fail := func(msg string) {
 		s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: peerFormData(f, msg)})
@@ -873,4 +886,213 @@ func removePeer(doc, name string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("peer %q is not defined in the config file (it may come from a template or another file)", name)
+}
+
+// ---- enable / disable / comment ----
+
+type peerMeta struct {
+	off  bool
+	desc string
+}
+
+// peerMeta reads disabled/description of every peer defined in the config file.
+func (s *server) peerMeta() map[string]peerMeta {
+	m := map[string]peerMeta{}
+	cur, err := s.store.current()
+	if err != nil {
+		return m
+	}
+	var root yaml.Node
+	if yaml.Unmarshal([]byte(cur), &root) != nil {
+		return m
+	}
+	ps := findPeers(&root)
+	if ps == nil {
+		return m
+	}
+	for i := 0; i+1 < len(ps.Content); i += 2 {
+		pm := peerMeta{}
+		n := ps.Content[i+1]
+		for j := 0; n.Kind == yaml.MappingNode && j+1 < len(n.Content); j += 2 {
+			switch n.Content[j].Value {
+			case "disabled":
+				pm.off = n.Content[j+1].Value == "true"
+			case "description":
+				pm.desc = n.Content[j+1].Value
+			}
+		}
+		m[ps.Content[i].Value] = pm
+	}
+	return m
+}
+
+// setPeerKey sets (or, with val == nil, removes) one key of a peer and keeps everything else.
+func setPeerKey(doc, name, key string, val *yaml.Node) (string, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(doc), &root); err != nil {
+		return "", fmt.Errorf("current config is not valid YAML: %w", err)
+	}
+	n := findPeer(&root, name)
+	if n == nil {
+		return "", fmt.Errorf("peer %q is not defined in %s (it may come from a template or another file)", name, "the config file")
+	}
+	for i := 0; i+1 < len(n.Content); i += 2 {
+		if n.Content[i].Value == key {
+			if val == nil {
+				n.Content = append(n.Content[:i], n.Content[i+2:]...)
+			} else {
+				n.Content[i+1] = val
+			}
+			goto enc
+		}
+	}
+	if val != nil {
+		n.Content = append(n.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}, val)
+	}
+enc:
+	var b strings.Builder
+	e := yaml.NewEncoder(&b)
+	e.SetIndent(2)
+	if err := e.Encode(&root); err != nil {
+		return "", err
+	}
+	return b.String(), nil
+}
+
+func (s *server) peerTogglePage(w http.ResponseWriter, r *http.Request, sess *session) {
+	s.render(w, "peer_toggle", ctxPage{Title: "Peer", Nav: "peers", User: sess.user, CSRF: sess.csrf,
+		Data: map[string]any{"Name": r.URL.Query().Get("name"), "Off": r.URL.Query().Get("to") == "disable", "Err": ""}})
+}
+
+func (s *server) peerTogglePost(w http.ResponseWriter, r *http.Request, sess *session) {
+	name := strings.TrimSpace(r.PostFormValue("name"))
+	off := r.PostFormValue("to") == "disable"
+	fail := func(msg string) {
+		s.render(w, "peer_toggle", ctxPage{Title: "Peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"Name": name, "Off": off, "Err": msg}})
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		fail("Read config: " + err.Error())
+		return
+	}
+	var val *yaml.Node
+	if off {
+		val = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"}
+	}
+	cand, err := setPeerKey(cur, name, "disabled", val)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	what := "Enable peer "
+	if off {
+		what = "Disable peer "
+	}
+	s.review(w, sess, cur, cand, what+name)
+}
+
+func (s *server) peerCommentPage(w http.ResponseWriter, r *http.Request, sess *session) {
+	name := r.URL.Query().Get("name")
+	s.render(w, "peer_comment", ctxPage{Title: "Comment", Nav: "peers", User: sess.user, CSRF: sess.csrf,
+		Data: map[string]any{"Name": name, "Desc": s.peerMeta()[name].desc, "Err": ""}})
+}
+
+func (s *server) peerCommentPost(w http.ResponseWriter, r *http.Request, sess *session) {
+	name := strings.TrimSpace(r.PostFormValue("name"))
+	desc := strings.TrimSpace(r.PostFormValue("description"))
+	fail := func(msg string) {
+		s.render(w, "peer_comment", ctxPage{Title: "Comment", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"Name": name, "Desc": desc, "Err": msg}})
+	}
+	if len(desc) > 120 || strings.ContainsAny(desc, "\"\n\r") {
+		fail("Comment: max 120 characters, no double quotes.")
+		return
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		fail("Read config: " + err.Error())
+		return
+	}
+	var val *yaml.Node
+	if desc != "" {
+		val = &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: desc, Style: yaml.DoubleQuotedStyle}
+	}
+	cand, err := setPeerKey(cur, name, "description", val)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	s.review(w, sess, cur, cand, "Comment peer "+name)
+}
+
+// peerNewRaw adds one or more peers from raw YAML typed by the user. Accepted: "Name: {asn: .., neighbors: [..]}"
+// blocks, optionally wrapped in a top-level "peers:" key. Goes through the same review/dry-run/apply as the form.
+func (s *server) peerNewRaw(w http.ResponseWriter, r *http.Request, sess *session) {
+	raw := strings.TrimRight(r.PostFormValue("raw"), " \t\r\n")
+	fail := func(msg string) {
+		d := peerFormData(nil, msg)
+		d["Raw"], d["Mode"] = raw, "raw"
+		s.render(w, "peer_new", ctxPage{Title: "Add peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: d})
+	}
+	if strings.TrimSpace(raw) == "" {
+		fail("Syntax is empty.")
+		return
+	}
+	if len(raw) > 64<<10 {
+		fail("Syntax is too large (max 64 KiB).")
+		return
+	}
+	var n yaml.Node
+	if err := yaml.Unmarshal([]byte(raw), &n); err != nil {
+		fail("Invalid YAML: " + err.Error())
+		return
+	}
+	if len(n.Content) == 0 || n.Content[0].Kind != yaml.MappingNode {
+		fail("Expected a mapping: peer name, then its settings (see the example).")
+		return
+	}
+	m := n.Content[0]
+	if len(m.Content) == 2 && m.Content[0].Value == "peers" && m.Content[1].Kind == yaml.MappingNode {
+		m = m.Content[1]
+	}
+	if len(m.Content) == 0 {
+		fail("No peer found in the syntax.")
+		return
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		fail("Read config: " + err.Error())
+		return
+	}
+	var names []string
+	cand := cur
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		name, peer := strings.TrimSpace(m.Content[i].Value), m.Content[i+1]
+		if name == "" || len(name) > 64 || strings.ContainsAny(name, "\"\n\r") {
+			fail("Invalid peer name.")
+			return
+		}
+		if peer.Kind != yaml.MappingNode {
+			fail("Peer " + name + ": settings must be a mapping (asn, neighbors, ...).")
+			return
+		}
+		hasASN, hasNb := false, false
+		for j := 0; j+1 < len(peer.Content); j += 2 {
+			switch peer.Content[j].Value {
+			case "asn":
+				hasASN = peer.Content[j+1].Value != ""
+			case "neighbors":
+				hasNb = len(peer.Content[j+1].Content) > 0
+			}
+		}
+		if !hasASN || !hasNb {
+			fail("Peer " + name + ": asn and neighbors are required.")
+			return
+		}
+		if cand, err = insertPeer(cand, name, peer); err != nil {
+			fail(err.Error())
+			return
+		}
+		names = append(names, name)
+	}
+	s.review(w, sess, cur, cand, "Add peer "+strings.Join(names, ", ")+" (syntax)")
 }

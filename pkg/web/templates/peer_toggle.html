@@ -1,0 +1,8 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>{{if .Off}}Disable{{else}}Enable{{end}} peer</h2></div>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<form class="frm" method="post" action="/peers/toggle"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="name" value="{{.Name}}"><input type="hidden" name="to" value="{{if .Off}}disable{{else}}enable{{end}}">
+<p class="w">{{if .Off}}Disable{{else}}Enable{{end}} peer <b>{{.Name}}</b>? {{if .Off}}The BGP session is shut down (disabled: true).{{else}}The BGP session is started again.{{end}} The next step shows the diff and a dry-run; nothing changes until you press Apply.</p>
+<div class="w act"><a class="btn" href="/">Cancel</a><button class="pri{{if .Off}} dng{{end}}">Review</button></div>
+</form>
+{{end}}{{end}}

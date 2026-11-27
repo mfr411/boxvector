@@ -1,0 +1,10 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>Comment</h2></div>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<form class="frm" method="post" action="/peers/comment"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="name" value="{{.Name}}">
+<div class="w"><label>Peer</label> <b>{{.Name}}</b></div>
+<div class="w"><label for="cm">Comment</label> <input id="cm" name="description" value="{{.Desc}}" maxlength="120" autocomplete="off" style="width:100%"></div>
+<p class="w s">Saved as the peer description. Leave empty to remove it. Nothing changes until you press Apply.</p>
+<div class="w act"><a class="btn" href="/">Cancel</a><button class="pri">Review</button></div>
+</form>
+{{end}}{{end}}

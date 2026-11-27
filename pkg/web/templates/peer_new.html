@@ -2,6 +2,15 @@
 <div class="bar"><h2>{{if .Edit}}Edit peer{{else}}Add peer{{end}}</h2></div>
 {{if .Err}}<p class="err">{{.Err}}</p>{{end}}
 <form class="frm" method="post" action="{{if .Edit}}/peers/edit{{else}}/peers/new{{end}}"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+{{if not .Edit}}<input type="hidden" name="mode" value="{{if eq .Mode "raw"}}raw{{else}}form{{end}}"><div class="w mtabs" role="tablist"><button type="button" class="mt{{if ne .Mode "raw"}} on{{end}}" data-m="form">Form</button><button type="button" class="mt{{if eq .Mode "raw"}} on{{end}}" data-m="raw">Syntax</button></div>
+<div class="w rawp"{{if ne .Mode "raw"}} hidden{{end}}><textarea name="raw" class="rawta" rows="16" spellcheck="false" autocomplete="off"{{if ne .Mode "raw"}} disabled{{end}} placeholder="Example Networks:
+  asn: 65510
+  neighbors: [203.0.113.1, 2001:db8::1]
+  description: &quot;Example transit&quot;
+  template: peer
+  as-set: AS-EXAMPLE
+  filter-rpki: true">{{.Raw}}</textarea><p class="s">YAML, same keys as the config file. Several peers can be pasted at once, with or without a top-level <code>peers:</code>. It is checked and dry-run before anything is applied.</p></div>
+<div class="fgrp"{{if eq .Mode "raw"}} hidden{{end}}>{{end}}
 <label>Name<input name="name" value="{{index .F "name"}}" required maxlength="64" placeholder="Example Networks"{{if .Edit}} readonly class="ro" title="The name is the peer key and cannot be changed"{{end}}></label>
 <label>ASN<input name="asn" value="{{index .F "asn"}}" required inputmode="numeric" placeholder="65510"></label>
 <label class="w">Neighbors<textarea name="neighbors" rows="2" required placeholder="203.0.113.1, 2001:db8::1">{{index .F "neighbors"}}</textarea></label>
@@ -13,6 +22,7 @@
 <h3 class="w">Policy rules <span class="s">· Inherit follows the template, then the global default</span></h3>
 <div class="w rg">{{$F := .F}}{{range .Rules}}{{$k := printf "r_%s" .Key}}{{$v := index $F $k}}<div class="rl"><span>{{.Label}}<small>{{.Hint}}</small></span>
 <select name="{{$k}}"{{if and $v (ne $v "inherit")}} class="ov"{{end}}><option value="inherit">Inherit ({{if .Def}}on{{else}}off{{end}})</option><option value="on"{{if eq $v "on"}} selected{{end}}>On</option><option value="off"{{if eq $v "off"}} selected{{end}}>Off</option></select></div>{{end}}</div>
+{{if not .Edit}}</div>{{end}}
 <div class="w act"><a class="btn" href="/">Cancel</a><button class="pri">Review</button></div>
 </form>
 <p class="s">Nothing is applied yet. The next page shows the diff and a dry-run before you apply.</p>
