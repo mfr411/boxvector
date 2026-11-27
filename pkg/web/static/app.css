@@ -230,3 +230,9 @@ td,th{white-space:nowrap}td.wrap,td .wrap{white-space:normal}
 .tabb{text-decoration:none}.tabb.on{background:#d9e8fb;border-color:#9db6e4;font-weight:600}
 .rq{margin-left:auto;display:flex;gap:8px;align-items:center}
 .rt.rk{min-width:0}.rt.rk col:nth-child(1){width:auto}.rt.rk col:nth-child(2){width:130px}.rt.rk col:nth-child(3){width:200px}.rt.rk col:nth-child(4){width:130px}.rt.rk col:nth-child(5){width:90px}
+/* column resize handles */
+.ift th{position:relative}
+.ift th .rz{position:absolute;top:0;right:-3px;width:7px;height:100%;cursor:col-resize;z-index:2}
+.ift th .rz:hover,body.rzing .ift th .rz:active{background:rgba(75,87,198,.25)}
+body.rzing{cursor:col-resize;user-select:none}
+.tw{overflow-x:auto}
