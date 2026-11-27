@@ -383,3 +383,7 @@ tr.cfg.dis td{color:#888}.cmt{margin-left:6px}#rtb[hidden]{display:none}
 [hidden]{display:none!important}
 .ifbn{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;border:1px solid #e0c36a;background:#fff8e1;border-radius:5px;font-size:13px}
 .ifbn span{flex:1}
+.tbg{display:inline-flex;gap:4px;margin:0 6px}
+.tbg .btn:disabled{opacity:.55;cursor:default}
+.tbg .btn.dl:not(:disabled){color:#b3261e}
+#ift tr.sel td{background:#dbe7ff}

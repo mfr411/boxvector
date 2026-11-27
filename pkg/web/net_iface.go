@@ -212,8 +212,11 @@ func (m *ifMgr) rollback() error {
 	if err := m.writeAll(); err != nil {
 		return err
 	}
-	_, err := m.reload()
-	applyAddrDiff(cur, m.state)
+	var err error
+	if structChanged(cur, m.state) {
+		_, err = m.reload()
+	}
+	_ = applyAddrDiff(cur, m.state)
 	return err
 }
 
@@ -237,9 +240,13 @@ func (m *ifMgr) change(summary string, mutate func(s map[string]*ifc) error) err
 		_ = m.rollback()
 		return err
 	}
-	if out, err := m.reload(); err != nil {
-		_ = m.rollback()
-		return errors.New("ifreload failed, change reverted: " + out)
+	// ifreload only when a VLAN/bridge is added/removed: reloading flaps links, so plain address/MTU
+	// changes on existing interfaces go through ip directly.
+	if structChanged(snap, m.state) {
+		if out, err := m.reload(); err != nil {
+			_ = m.rollback()
+			return errors.New("ifreload failed, change reverted: " + out)
+		}
 	}
 	if err := applyAddrDiff(snap, m.state); err != nil {
 		_ = m.rollback()
@@ -635,4 +642,27 @@ func installHook() error {
 		return err
 	}
 	return writeFileAtomic(p, []byte(hookScript), 0o755)
+}
+
+// structChanged reports whether managed VLANs/bridges (anything but plain address/MTU entries) differ.
+func structChanged(a, b map[string]*ifc) bool {
+	pick := func(s map[string]*ifc) map[string]string {
+		m := map[string]string{}
+		for n, c := range s {
+			if c.Kind != "addr" {
+				m[n] = c.render()
+			}
+		}
+		return m
+	}
+	x, y := pick(a), pick(b)
+	if len(x) != len(y) {
+		return true
+	}
+	for n, v := range x {
+		if y[n] != v {
+			return true
+		}
+	}
+	return false
 }
