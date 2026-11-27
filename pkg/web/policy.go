@@ -12,7 +12,7 @@ import (
 //
 //	only <cond>            reject everything that does NOT match
 //	reject <cond>          reject what matches (alias: suppress, deny)
-//	med N | prepend N (export) | add-community A:B | add-large-community A:B:C  [when <cond>]
+//	med N | prepend N | add-community A:B | add-large-community A:B:C  [when <cond>]
 //
 // <cond> = [not] term (and|or [not] term)...   (and/or cannot be mixed on one line)
 // terms: origin, first-as, path-contains, path-len, path, prefix, community, large-community, ipv4, ipv6
@@ -328,9 +328,6 @@ func compileRule(line string, dir polDir) (string, error) {
 		}
 		act = fmt.Sprintf("bgp_med = %d;", n)
 	case "prepend":
-		if dir != polExport {
-			return "", fmt.Errorf("prepend only applies to export")
-		}
 		a, err := one()
 		n, e2 := strconv.Atoi(a)
 		if err != nil || e2 != nil || n < 1 || n > 10 {
