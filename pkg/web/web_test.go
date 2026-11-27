@@ -148,3 +148,17 @@ func TestReplacePeerKeepsUnmanagedKeys(t *testing.T) {
 		t.Error("expected error for unknown peer")
 	}
 }
+
+func TestRemovePeer(t *testing.T) {
+	doc := "peers:\n  A:\n    asn: 65001\n  B:\n    asn: 65002\n"
+	out, err := removePeer(doc, "A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(out, "65001") || !strings.Contains(out, "65002") || !strings.Contains(out, "B:") {
+		t.Errorf("unexpected:\n%s", out)
+	}
+	if _, err := removePeer(doc, "Z"); err == nil {
+		t.Error("expected error")
+	}
+}

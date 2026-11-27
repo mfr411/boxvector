@@ -269,3 +269,22 @@ input.ro{background:#eceef3;color:#666}
 .pt col:nth-child(7){width:100px}
 .pt col:nth-child(8){width:190px}
 .pt{width:100%;min-width:1150px}
+
+/* ---- subtle motion (short, no bounce) ---- */
+button,.btn,.menu a,.ift tbody tr td,.ift th,input,select,textarea,.rz,.st{transition:background-color .14s ease,border-color .14s ease,color .14s ease,box-shadow .16s ease}
+button:active:not(:disabled),.btn:active{transform:translateY(.5px)}
+.ift tbody tr:hover td{background:#eef3fb}.ift tr.sel:hover td{background:#d9e8fb}
+input:focus,select:focus,textarea:focus{border-color:#7d86d6;box-shadow:0 0 0 2px rgba(98,108,201,.16);outline:0}
+.rl select,.pt .st{transition:none}
+.main,main{animation:bvin .18s ease-out both}
+@keyframes bvin{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.fw{animation:fwin .17s cubic-bezier(.2,.8,.2,1) both;background:rgba(244,245,248,.93);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);transition:opacity .14s ease,box-shadow .16s ease}
+.fw .fwb{background:transparent}
+.fw.out{animation:fwout .14s ease-in both;pointer-events:none}
+.fw.drag{opacity:.88;box-shadow:0 14px 40px rgba(30,34,70,.3)}
+.fwb .frm>.act{background:rgba(244,245,248,.96)}
+@keyframes fwin{from{opacity:0;transform:translateY(-6px) scale(.985)}to{opacity:1;transform:none}}
+@keyframes fwout{to{opacity:0;transform:translateY(-4px) scale(.99)}}
+button.dng,.btn.dng{color:#a12b2b}button.dng:hover{background:#fbeeee;border-color:#e0b4b4}
+button.pri.dng{background:#fff;border-color:#d9a3a3}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

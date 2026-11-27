@@ -21,7 +21,7 @@ function build(){
   fw.addEventListener('mousedown',function(){fw.classList.add('top')});
 }
 function fit(){if(!fw)return;fw.style.maxHeight=Math.max(220,innerHeight-fw.offsetTop-12)+'px'}
-function close_(){if(fw){fw.remove();fw=null}}
+function close_(){if(!fw)return;var f=fw;fw=null;f.classList.add('out');setTimeout(function(){f.remove()},140)}
 function body(){return fw.querySelector('.fwb')}
 function grab(html){return new DOMParser().parseFromString(html,'text/html')}
 function setForm(doc,keep){
@@ -62,6 +62,7 @@ function open_(url,title,post){
 btn.addEventListener('click',function(e){if(e.ctrlKey||e.metaKey||e.shiftKey)return;e.preventDefault();
   if(fw&&act==='/peers/new'){fw.classList.add('top');return}
   open_('/peers/new','add peer','/peers/new')});
+window.bvDeletePeer=function(name){open_('/peers/delete?name='+encodeURIComponent(name),'delete peer · '+name,'/peers/delete')};
 window.bvEditPeer=function(name){open_('/peers/edit?name='+encodeURIComponent(name),'edit peer · '+name,'/peers/edit')};
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&fw&&document.activeElement&&fw.contains(document.activeElement))close_()});
 })();

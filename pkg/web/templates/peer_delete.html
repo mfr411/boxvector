@@ -1,0 +1,8 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>Delete peer</h2></div>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<form class="frm" method="post" action="/peers/delete"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="name" value="{{.Name}}">
+<p class="w">Remove peer <b>{{.Name}}</b> from the configuration? The next step shows the diff and a dry-run; nothing changes until you press Apply.</p>
+<div class="w act"><a class="btn" href="/">Cancel</a><button class="pri dng">Review</button></div>
+</form>
+{{end}}{{end}}

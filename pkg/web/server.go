@@ -114,7 +114,7 @@ func Serve(opt Options) error {
 		"ago": func(t time.Time) string { return t.Format("02 Jan 15:04:05") },
 		"op":  func(b byte) string { return string(b) },
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "config", "review", "routes", "logs", "interfaces"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "config", "review", "routes", "logs", "interfaces"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -134,6 +134,8 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /config/review", s.authed(s.reviewPost))
 	mux.HandleFunc("GET /peers/edit", s.authed(s.peerEditPage))
 	mux.HandleFunc("POST /peers/edit", s.authed(s.peerEditPost))
+	mux.HandleFunc("GET /peers/delete", s.authed(s.peerDeletePage))
+	mux.HandleFunc("POST /peers/delete", s.authed(s.peerDeletePost))
 	mux.HandleFunc("POST /config/apply", s.authed(s.applyPost))
 	mux.HandleFunc("POST /config/restore", s.authed(s.restorePost))
 	mux.HandleFunc("GET /routes", s.authed(s.routesPage))
@@ -804,4 +806,53 @@ func (s *server) routesPage(w http.ResponseWriter, r *http.Request, sess *sessio
 func (s *server) logsPage(w http.ResponseWriter, r *http.Request, sess *session) {
 	s.render(w, "logs", ctxPage{Title: "Logs", Nav: "logs", User: sess.user, CSRF: sess.csrf,
 		Data: map[string]any{"Events": s.store.History(100)}})
+}
+
+// ---- delete peer ----
+
+func (s *server) peerDeletePage(w http.ResponseWriter, r *http.Request, sess *session) {
+	s.render(w, "peer_delete", ctxPage{Title: "Delete peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"Name": r.URL.Query().Get("name"), "Err": ""}})
+}
+
+func (s *server) peerDeletePost(w http.ResponseWriter, r *http.Request, sess *session) {
+	name := strings.TrimSpace(r.PostFormValue("name"))
+	fail := func(msg string) {
+		s.render(w, "peer_delete", ctxPage{Title: "Delete peer", Nav: "peers", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"Name": name, "Err": msg}})
+	}
+	cur, err := s.store.current()
+	if err != nil {
+		fail("Read config: " + err.Error())
+		return
+	}
+	cand, err := removePeer(cur, name)
+	if err != nil {
+		fail(err.Error())
+		return
+	}
+	s.review(w, sess, cur, cand, "Delete peer "+name)
+}
+
+// removePeer drops one peer from the peers map and leaves everything else as is.
+func removePeer(doc, name string) (string, error) {
+	var root yaml.Node
+	if err := yaml.Unmarshal([]byte(doc), &root); err != nil {
+		return "", fmt.Errorf("current config is not valid YAML: %w", err)
+	}
+	ps := findPeers(&root)
+	if ps == nil {
+		return "", fmt.Errorf("no peers section in the config file")
+	}
+	for i := 0; i+1 < len(ps.Content); i += 2 {
+		if ps.Content[i].Value == name {
+			ps.Content = append(ps.Content[:i], ps.Content[i+2:]...)
+			var b strings.Builder
+			enc := yaml.NewEncoder(&b)
+			enc.SetIndent(2)
+			if err := enc.Encode(&root); err != nil {
+				return "", err
+			}
+			return b.String(), nil
+		}
+	}
+	return "", fmt.Errorf("peer %q is not defined in the config file (it may come from a template or another file)", name)
 }
