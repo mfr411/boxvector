@@ -1,7 +1,10 @@
 (function(){
 var prev={},data=[],sel='',tb=document.querySelector('#ift tbody'),q=document.getElementById('ifq'),f=document.getElementById('iff'),cn=document.getElementById('ifn'),ov=document.getElementById('ov'),dlg=document.getElementById('dlg'),win=document.getElementById('win');
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-function bps(n){return n>=1e9?(n/1e9).toFixed(1)+' Gbps':n>=1e6?(n/1e6).toFixed(1)+' Mbps':n>=1e3?(n/1e3).toFixed(1)+' kbps':Math.round(n)+' bps'}
+function bps(n){var u=['bps','kbps','Mbps','Gbps','Tbps'],i=0;while(n>=1000&&i<4){n/=1000;i++}
+  var v=i?(n>=100?n.toFixed(0):n>=10?n.toFixed(1):n.toFixed(2)):String(Math.round(n));
+  return '<span class="bv">'+v+'</span><span class="bu">'+u[i]+'</span>'}
+function pps(n){return n>=1e6?(n/1e6).toFixed(1)+' M':n>=1e3?(n/1e3).toFixed(1)+' k':String(n)}
 function spd(m){return !m?'-':m>=1000?(m/1000)+' Gbps':m+' Mbps'}
 var ICB='<svg viewBox="0 0 16 16"><path d="M8 4v4M3.5 12V8h9v4" fill="none" stroke="#6b7280" stroke-width="1.3"/><rect x="5.5" y="1.5" width="5" height="3" fill="#6b7280"/><rect x="1.5" y="11" width="4" height="3" fill="#6b7280"/><rect x="10.5" y="11" width="4" height="3" fill="#6b7280"/></svg>',
 ICX='<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5" fill="none" stroke="#6b7280" stroke-width="1.4"/><circle cx="8" cy="8" r="1.8" fill="#6b7280"/></svg>',
@@ -18,7 +21,7 @@ function draw(){
     if(m==='up'&&!x.up||m==='down'&&x.up)return;
     if(k&&(x.n+' '+x.type+' '+x.mac+' '+x.drv+' '+x.v4.join(' ')+' '+x.v6.join(' ')).toLowerCase().indexOf(k)<0)return;
     n++;var r=x.r||{tx:0,rx:0,txp:0,rxp:0};
-    h+='<tr data-n="'+esc(x.n)+'" class="'+(x.up?'':'dis')+(x.n===sel?' sel':'')+'"><td class="fl">'+(x.dis?'X':x.up?'R':'')+'</td><td class="nm'+(x.master?' sub':'')+'"><span class="ei">'+ico(x)+'</span>'+esc(x.n)+'</td><td>'+esc(x.type)+'</td><td class="n">'+x.mtu+'</td><td class="n">'+bps(r.tx)+'</td><td class="n">'+bps(r.rx)+'</td><td class="n">'+r.txp+'</td><td class="n">'+r.rxp+'</td><td>'+esc(x.drv)+'</td><td class="n">'+spd(x.spd)+'</td><td class="mac">'+esc(x.mac)+'</td></tr>';
+    h+='<tr data-n="'+esc(x.n)+'" class="'+(x.up?'':'dis')+(x.n===sel?' sel':'')+'"><td class="fl">'+(x.dis?'X':x.up?'R':'')+'</td><td class="nm'+(x.master?' sub':'')+'"><span class="ei">'+ico(x)+'</span>'+esc(x.n)+'</td><td>'+esc(x.type)+'</td><td class="n">'+x.mtu+'</td><td class="n r">'+bps(r.tx)+'</td><td class="n r">'+bps(r.rx)+'</td><td class="n">'+pps(r.txp)+'</td><td class="n">'+pps(r.rxp)+'</td><td>'+esc(x.drv)+'</td><td class="n">'+spd(x.spd)+'</td><td class="mac">'+esc(x.mac)+'</td></tr>';
   });
   tb.innerHTML=h;cn.textContent=n+' items';
 }

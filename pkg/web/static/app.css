@@ -170,3 +170,25 @@ td,th{white-space:nowrap}td.wrap,td .wrap{white-space:normal}
 .pn{height:380px}
 .ift th,.ift td{padding-left:9px;padding-right:9px}
 .menu a{padding-right:12px}
+/* fixed columns: values never shift the layout */
+.ift{table-layout:fixed;width:1060px}
+.ift td,.ift th{overflow:hidden;text-overflow:ellipsis}
+.ift td.n{font-variant-numeric:tabular-nums}
+.ift td.r{white-space:nowrap}
+.ift .bv{display:inline-block;width:46px;text-align:right}
+.ift .bu{display:inline-block;width:40px;text-align:left;padding-left:4px;color:#555}
+.ift col:nth-child(1){width:30px}
+.ift col:nth-child(2){width:160px}
+.ift col:nth-child(3){width:84px}
+.ift col:nth-child(4){width:64px}
+.ift col:nth-child(5){width:112px}
+.ift col:nth-child(6){width:112px}
+.ift col:nth-child(7){width:96px}
+.ift col:nth-child(8){width:96px}
+.ift col:nth-child(9){width:90px}
+.ift col:nth-child(10){width:76px}
+.ift col:nth-child(11){width:140px}
+.ift{width:1090px}
+.ift col:nth-child(7),.ift col:nth-child(8){width:84px}
+.ift col:nth-child(11){width:164px}
+.ift col:nth-child(2){width:150px}
