@@ -232,6 +232,9 @@ func vppMutate(root *yaml.Node, f func(string) string) (string, error) {
 		if err != nil {
 			return "", errors.New("parent " + parent + " not found (or cannot carry sub-interfaces)")
 		}
+		if st := yGet(pn, "state"); st == nil || st.Value != "up" {
+			ySet(pn, "state", yScalar("up", "!!str"), false) // vppcfg refuses an up sub-interface on a down parent
+		}
 		id := vid
 		if inner > 0 {
 			id = vid*4096 + inner // QinQ: one sub-interface id per outer/inner pair
@@ -353,6 +356,13 @@ func (m *vppMgr) apply(b []byte) error {
 
 func lastLines(s string, n int) string {
 	l := strings.Split(strings.TrimSpace(s), "\n")
+	for i, x := range l {
+		x = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(x), "[ERROR ]"))
+		if j := strings.Index(x, ": "); j > 0 && strings.Contains(x[:j], ".") {
+			x = x[j+2:]
+		}
+		l[i] = x
+	}
 	if len(l) > n {
 		l = l[len(l)-n:]
 	}

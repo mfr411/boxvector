@@ -1,9 +1,18 @@
 {{define "body"}}{{with .Data}}
 <div class="bar"><h2>{{.Title}}</h2></div>
-{{if eq .Mode "done"}}<p class="w">Applied: <b>{{.Done}}</b></p><p class="w s">Check that everything still works, then press Confirm in the bar above the table. Without confirmation it is reverted automatically after 60 seconds.</p><div class="w act"><a class="btn pri" href="/interfaces">Close</a></div>
+{{if eq .Mode "done"}}<p class="w">Applied: <b>{{.Done}}</b></p><p class="w s">Check that everything still works, then press Confirm in the bar above the table. Without confirmation it is reverted automatically after 60 seconds.</p><div class="w act"><a class="btn pri" href="{{if .VPP}}/vpp{{else}}/interfaces{{end}}">Close</a></div>
 {{else}}{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
-<form class="frm" method="post" action="/ifaces/{{if eq .Mode "new"}}new{{else}}act{{end}}"><input type="hidden" name="csrf" value="{{$.CSRF}}">
-{{if eq .Mode "new"}}
+<form class="frm" method="post" action="/{{if .VPP}}vppif{{else}}ifaces{{end}}/{{if eq .Mode "new"}}new{{else}}act{{end}}"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+{{if and (eq .Mode "new") .VPP}}
+<input type="hidden" name="op" value="sub">
+<label>Parent interface<input name="parent" list="ifdevs" value="{{index .F "parent"}}" maxlength="63" autocomplete="off" placeholder="e.g. TenGigabitEthernet3/0/0, bond0"></label>
+<label>Encapsulation<select name="proto"><option value="dot1q"{{if ne (index .F "proto") "dot1ad"}} selected{{end}}>802.1Q (dot1q)</option><option value="dot1ad"{{if eq (index .F "proto") "dot1ad"}} selected{{end}}>802.1ad (QinQ outer)</option></select></label>
+<label>VLAN ID (outer)<input name="vid" value="{{index .F "vid"}}" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="100"></label>
+<label>Inner VLAN ID<input name="inner" value="{{index .F "inner"}}" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="optional, for QinQ"></label>
+<label class="w">IP address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" autocomplete="off" placeholder="optional, 192.0.2.1/24"></label>
+<datalist id="ifdevs">{{range .Devs}}<option value="{{.}}">{{end}}</datalist>
+<p class="w s">Saved to /etc/vpp/boxvector-vppcfg.yaml and applied with vppcfg. Reverts automatically unless confirmed.</p>
+{{else if eq .Mode "new"}}
 <label>Type<select name="op" id="ifop"><option value="vlan"{{if eq (index .F "op") "vlan"}} selected{{end}}>VLAN</option><option value="bridge"{{if eq (index .F "op") "bridge"}} selected{{end}}>Bridge</option></select></label>
 <label>Parent interface (VLAN)<input name="parent" list="ifdevs" value="{{index .F "parent"}}" maxlength="15" autocomplete="off" placeholder="e.g. eth0, bond0, br0, or another VLAN"></label>
 <label>VLAN ID<input name="vid" value="{{index .F "vid"}}" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="100"></label>
@@ -19,9 +28,10 @@
 {{if eq (index .F "op") "addaddr"}}<label class="w">Address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" required autocomplete="off" placeholder="192.0.2.1/24"></label>
 <label class="w">Gateway<input name="gw" value="{{index .F "gw"}}" maxlength="45" autocomplete="off" placeholder="optional, must be in the same subnet"></label>{{end}}
 {{if eq (index .F "op") "deladdr"}}<label class="w">Address (CIDR)<input name="addr" value="{{index .F "addr"}}" maxlength="49" required autocomplete="off"></label>{{end}}
+{{if eq (index .F "op") "state"}}<label class="w">State<select name="state"><option value="up">up</option><option value="down">down</option></select></label>{{end}}
 {{if eq (index .F "op") "mtu"}}<label class="w">MTU<input name="mtu" value="{{index .F "mtu"}}" inputmode="numeric" maxlength="4" required autocomplete="off" placeholder="1500"></label>{{end}}
 {{if .Force}}<label class="w"><input type="checkbox" name="force" value="1"> I understand this may cut my own session, do it anyway</label>{{end}}
 {{end}}
-<div class="w act"><a class="btn" href="/interfaces">Cancel</a><button class="pri{{if .Danger}} dng{{end}}">{{if eq .Mode "new"}}Add{{else}}Apply{{end}}</button></div>
+<div class="w act"><a class="btn" href="{{if .VPP}}/vpp{{else}}/interfaces{{end}}">Cancel</a><button class="pri{{if .Danger}} dng{{end}}">{{if eq .Mode "new"}}Add{{else}}Apply{{end}}</button></div>
 </form>{{end}}
 {{end}}{{end}}

@@ -27,13 +27,15 @@ func sysIfaces() []string {
 
 func (s *server) ifPage(w http.ResponseWriter, sess *session, f map[string]string, data map[string]any) {
 	data["F"] = f
-	data["Devs"] = sysIfaces()
+	if _, ok := data["Devs"]; !ok {
+		data["Devs"] = sysIfaces()
+	}
 	s.render(w, "ifedit", ctxPage{Title: "Interfaces", Nav: "interfaces", User: sess.user, CSRF: sess.csrf, Data: data})
 }
 
 func ifForm(r *http.Request) map[string]string {
 	f := map[string]string{}
-	for _, k := range []string{"op", "dev", "parent", "vid", "name", "ports", "addr", "gw", "mtu"} {
+	for _, k := range []string{"op", "dev", "parent", "vid", "name", "ports", "addr", "gw", "mtu", "inner", "proto", "state"} {
 		v := r.PostFormValue(k)
 		if v == "" {
 			v = r.URL.Query().Get(k)
