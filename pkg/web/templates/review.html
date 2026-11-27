@@ -8,6 +8,6 @@
 <pre class="out">{{if .Out}}{{.Out}}{{else}}(no output){{end}}</pre>
 <form method="post" action="/config/apply" class="act"><input type="hidden" name="csrf" value="{{$.CSRF}}">
 <input type="hidden" name="what" value="{{.What}}"><textarea name="text" hidden>{{.Cand}}</textarea>
-<a class="btn" href="/config">Cancel</a>{{if .OK}}<button class="pri" data-confirm="Apply to BIRD now?">Apply</button>{{end}}
+<a class="btn" href="/config">Cancel</a>{{if .OK}}<button class="pri" data-confirm="{{.What}}?">Apply</button>{{end}}
 </form>{{end}}
 {{end}}{{end}}

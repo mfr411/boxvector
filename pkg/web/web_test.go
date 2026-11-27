@@ -194,3 +194,20 @@ func TestStaticRouteEdit(t *testing.T) {
 		}
 	}
 }
+
+func TestReviewConfirmNamesAction(t *testing.T) {
+	tp := template.Must(template.New("").Funcs(template.FuncMap{"op": func(int) string { return "+" }}).ParseFS(assets, "templates/layout.html", "templates/review.html"))
+	for _, what := range []string{"Disable static route 1.99.99.1/32", "Add peer x"} {
+		var b strings.Builder
+		data := map[string]any{"What": what, "Diff": []struct {
+			Op   int
+			Text string
+		}{{1, "x"}}, "OK": true, "Out": "ok", "Cand": "c"}
+		if err := tp.ExecuteTemplate(&b, "layout", ctxPage{Title: "Review", Data: data}); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(b.String(), `data-confirm="`+what+`?"`) || strings.Contains(b.String(), "Apply to BIRD now") {
+			t.Errorf("confirm text should be %q", what+"?")
+		}
+	}
+}
