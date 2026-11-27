@@ -7,6 +7,20 @@ if [ "$1" = configure ]; then
   fi
   getent group bird >/dev/null && adduser --quiet boxvector bird || true
   install -d -o boxvector -g boxvector -m 0750 /etc/boxvector /var/lib/boxvector /var/lib/boxvector/cache
+  # HTTPS for the web UI: generate a self-signed certificate once; a certificate you install yourself is never replaced
+  if [ ! -s /etc/boxvector/tls/web.crt ] || [ ! -s /etc/boxvector/tls/web.key ]; then
+    install -d -o boxvector -g boxvector -m 0750 /etc/boxvector/tls
+    h=$(hostname -f 2>/dev/null || hostname)
+    san="DNS:$h,DNS:localhost,IP:127.0.0.1"
+    for ip in $(hostname -I 2>/dev/null); do san="$san,IP:$ip"; done
+    if openssl req -x509 -newkey rsa:3072 -nodes -days 3650 -subj "/CN=$h/O=boxvector" -addext "subjectAltName=$san" \
+         -keyout /etc/boxvector/tls/web.key -out /etc/boxvector/tls/web.crt >/dev/null 2>&1; then
+      chown boxvector:boxvector /etc/boxvector/tls/web.key /etc/boxvector/tls/web.crt
+      chmod 0600 /etc/boxvector/tls/web.key; chmod 0644 /etc/boxvector/tls/web.crt
+    else
+      echo "boxvector: could not create a TLS certificate; put your own in /etc/boxvector/tls/web.crt and web.key" >&2
+    fi
+  fi
   # files written by an earlier root run must stay writable by the service
   for f in /var/lib/boxvector/status.html; do [ -e "$f" ] && chown boxvector:boxvector "$f" || true; done
   # earlier releases kept the config in /etc/boxvector/: move it, never overwrite

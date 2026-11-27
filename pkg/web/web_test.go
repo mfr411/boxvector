@@ -162,3 +162,35 @@ func TestRemovePeer(t *testing.T) {
 		t.Error("expected error")
 	}
 }
+
+func TestStaticRouteEdit(t *testing.T) {
+	doc := "asn: 65501\nrouter-id: 192.0.2.1\n"
+	c, err := validateStatic("192.0.2.0/24", "unicast", "203.0.113.1", "", "uplink A")
+	if err != nil {
+		t.Fatal(err)
+	}
+	d1, err := addStatic(doc, c)
+	if err != nil || !strings.Contains(d1, "static-routes:") || !strings.Contains(d1, "prefix: 192.0.2.0/24") {
+		t.Fatalf("add: %v\n%s", err, d1)
+	}
+	if _, err := addStatic(d1, c); err == nil {
+		t.Fatal("duplicate accepted")
+	}
+	d2, err := editStatic(d1, "192.0.2.0/24", "disabled", &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: "true"})
+	if err != nil || !strings.Contains(d2, "disabled: true") {
+		t.Fatalf("disable: %v\n%s", err, d2)
+	}
+	d3, _ := editStatic(d2, "192.0.2.0/24", "disabled", nil)
+	if strings.Contains(d3, "disabled") {
+		t.Fatalf("enable left key:\n%s", d3)
+	}
+	d4, err := editStatic(d3, "192.0.2.0/24", "", nil)
+	if err != nil || strings.Contains(d4, "192.0.2.0/24") || strings.Contains(d4, "kernel") {
+		t.Fatalf("remove: %v\n%s", err, d4)
+	}
+	for _, bad := range [][5]string{{"192.0.2.1/24", "unicast", "203.0.113.1", "", ""}, {"2001:db8::/32", "unicast", "203.0.113.1", "", ""}, {"10.0.0.0/8", "blackhole", "1.1.1.1", "", ""}, {"10.0.0.0/8", "unicast", "", "", ""}, {"10.0.0.0/8", "unicast", "1.1.1.1", "300", ""}, {"10.0.0.0/8", "unicast", "1.1.1.1", "", "a;b"}} {
+		if _, err := validateStatic(bad[0], bad[1], bad[2], bad[3], bad[4]); err == nil {
+			t.Fatalf("accepted %v", bad)
+		}
+	}
+}

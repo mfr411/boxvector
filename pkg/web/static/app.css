@@ -377,3 +377,4 @@ button.ib.on,button.ib[aria-pressed=true]{background:#e8eefb;border-color:#9db4e
 .rawta{width:100%;box-sizing:border-box;font:12.5px/1.5 Consolas,"DejaVu Sans Mono",monospace;border:1px solid #c3c7d0;border-radius:5px;padding:8px 10px;resize:vertical;tab-size:2;background:#fbfbfd}
 .rawta:focus{outline:0;border-color:#9db4e6}
 .tools{flex-wrap:wrap;row-gap:6px}.tools .btn,.tools button{white-space:nowrap}.fbar{flex-wrap:wrap}.fbar .pri,.fbar #fclr{white-space:nowrap;height:25px}
+tr.cfg.dis td{color:#888}.cmt{margin-left:6px}#rtb[hidden]{display:none}

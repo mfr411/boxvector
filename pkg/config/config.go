@@ -282,6 +282,7 @@ type StaticRoute struct {
 	Type     string `yaml:"type" description:"unicast, blackhole, unreachable or prohibit" default:"unicast"`
 	Distance int    `yaml:"distance" description:"BIRD route preference 1-255 (0 = BIRD default)"`
 	Comment  string `yaml:"comment" description:"Free text, written as a BIRD comment"`
+	Disabled bool   `yaml:"disabled" description:"Keep the route in the config but do not generate it"`
 }
 
 type Kernel struct {

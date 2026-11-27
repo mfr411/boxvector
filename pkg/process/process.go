@@ -824,6 +824,9 @@ func parseStaticRoutes(c *config.Config) error {
 		}
 		seen[r.Prefix] = true
 		r.Comment = staticCommentRe.ReplaceAllString(r.Comment, "")
+		if r.Disabled {
+			continue
+		}
 		if v6 {
 			c.Kernel.StaticList6 = append(c.Kernel.StaticList6, *r)
 		} else {

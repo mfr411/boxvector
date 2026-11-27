@@ -113,8 +113,9 @@ func Serve(opt Options) error {
 			}
 			return s
 		},
-		"ago": func(t time.Time) string { return t.Format("02 Jan 15:04:05") },
-		"op":  func(b byte) string { return string(b) },
+		"ago":  func(t time.Time) string { return t.Format("02 Jan 15:04:05") },
+		"op":   func(b byte) string { return string(b) },
+		"list": func(v ...string) []string { return v },
 		"snapt": func(n string) string {
 			if tm, err := time.ParseInLocation("20060102-150405", n[:15], time.Local); err == nil && len(n) >= 15 {
 				return tm.Format("02 Jan 15:04:05")
@@ -122,7 +123,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "config", "review", "routes", "logs", "interfaces", "terminal"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "terminal"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -151,6 +152,12 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /config/apply", s.authed(s.applyPost))
 	mux.HandleFunc("POST /config/restore", s.authed(s.restorePost))
 	mux.HandleFunc("GET /routes", s.authed(s.routesPage))
+	mux.HandleFunc("GET /routes/new", s.authed(s.routeNewPage))
+	mux.HandleFunc("POST /routes/new", s.authed(s.routeNewPost))
+	mux.HandleFunc("GET /routes/act", s.authed(s.routeActPage))
+	mux.HandleFunc("POST /routes/act", s.authed(s.routeActPost))
+	mux.HandleFunc("GET /routes/comment", s.authed(s.routeCommentPage))
+	mux.HandleFunc("POST /routes/comment", s.authed(s.routeCommentPost))
 	mux.HandleFunc("GET /logs", s.authed(s.logsPage))
 	mux.HandleFunc("GET /terminal", s.authed(s.termPage))
 	mux.HandleFunc("POST /term/new", s.authed(s.termNew))
@@ -826,6 +833,9 @@ func (s *server) routesPage(w http.ResponseWriter, r *http.Request, sess *sessio
 			all = append(all, rows...)
 			tot += n
 		}
+	}
+	if view != "kernel" {
+		all = s.annotateStatics(all)
 	}
 	d["Rows"], d["Total"] = all, tot
 	if tot > len(all) {

@@ -1,0 +1,13 @@
+{{define "body"}}{{with .Data}}
+<div class="bar"><h2>Add route</h2></div>
+{{if .Err}}<p class="err">{{.Err}}</p>{{end}}
+<form class="frm" method="post" action="/routes/new"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<label>Dst. address<input name="prefix" value="{{index .F "prefix"}}" required maxlength="49" placeholder="192.0.2.0/24" autocomplete="off"></label>
+<label>Type<select name="type">{{range $t := (list "unicast" "blackhole" "unreachable" "prohibit")}}<option value="{{$t}}"{{if eq $t (index $.Data.F "type")}} selected{{end}}>{{$t}}</option>{{end}}</select></label>
+<label>Gateway<input name="via" value="{{index .F "via"}}" maxlength="64" placeholder="203.0.113.1 (unicast only)" autocomplete="off"></label>
+<label>Distance<input name="distance" value="{{index .F "distance"}}" inputmode="numeric" maxlength="3" placeholder="default"></label>
+<label class="w">Comment<input name="comment" value="{{index .F "comment"}}" maxlength="80" placeholder="optional" autocomplete="off"></label>
+<p class="w s">Saved to <code>kernel.static-routes</code> in the config. The next step shows the diff and a dry-run; nothing changes until you press Apply.</p>
+<div class="w act"><a class="btn" href="/routes">Cancel</a><button class="pri">Review</button></div>
+</form>
+{{end}}{{end}}

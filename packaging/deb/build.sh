@@ -29,7 +29,7 @@ Package: boxvector
 Version: $version
 Architecture: $arch
 Maintainer: nexcolo <https://www.nexcolo.com/>
-Depends: adduser, libc6 (>= 2.35), libcrypt1
+Depends: adduser, libc6 (>= 2.35), libcrypt1, openssl
 Recommends: bird3 | bird2, bgpq4
 Section: net
 Priority: optional

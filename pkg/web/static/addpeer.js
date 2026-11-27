@@ -2,7 +2,8 @@
 // Reuses the server form (GET /peers/new) and review (POST /peers/new); nothing is applied until Apply.
 (function(){
 var btn=document.querySelector('a.add');if(!btn)return;
-var act='/peers/new';
+var NEWURL=btn.getAttribute('href'),NEWT=btn.getAttribute('data-title')||'add peer';
+var act=NEWURL;
 var fw=null;
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 var ttl='add peer';
@@ -61,8 +62,9 @@ function open_(url,title,post){
   fetch(url,{credentials:'same-origin'}).then(function(r){return r.text()}).then(function(h){if(fw)setForm(grab(h))})
    .catch(function(){if(fw)body().innerHTML='<p class="err">Could not load the form.</p>'})}
 btn.addEventListener('click',function(e){if(e.ctrlKey||e.metaKey||e.shiftKey)return;e.preventDefault();
-  if(fw&&act==='/peers/new'){fw.classList.add('top');return}
-  open_('/peers/new','add peer','/peers/new')});
+  if(fw&&act===NEWURL){fw.classList.add('top');return}
+  open_(NEWURL,NEWT,NEWURL)});
+window.bvOpen=open_;
 window.bvDeletePeer=function(name){open_('/peers/delete?name='+encodeURIComponent(name),'delete peer · '+name,'/peers/delete')};
 window.bvTogglePeer=function(name,to){open_('/peers/toggle?name='+encodeURIComponent(name)+'&to='+to,to+' peer · '+name,'/peers/toggle')};
 window.bvCommentPeer=function(name){open_('/peers/comment?name='+encodeURIComponent(name),'comment · '+name,'/peers/comment')};

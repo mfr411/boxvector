@@ -15,6 +15,8 @@ const maxRouteRows = 2000
 
 type routeRow struct {
 	Prefix, Type, Source, Since, Pref, Via, Dev, Table string
+	Cfg, Off                                           bool // defined in kernel.static-routes / disabled there
+	Comment                                            string
 }
 
 var (
