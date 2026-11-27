@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 if [ "$1" = purge ]; then
-  rm -rf /etc/boxvector /var/lib/boxvector
+  rm -rf /etc/boxvector /etc/boxvector.yml /var/lib/boxvector
   deluser --quiet --system boxvector >/dev/null 2>&1 || true
 fi
 [ -d /run/systemd/system ] && systemctl daemon-reload >/dev/null 2>&1 || true

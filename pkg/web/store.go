@@ -143,9 +143,15 @@ func writeAtomic(path, content string) error {
 	}
 	tmp := path + ".bvtmp"
 	if err := os.WriteFile(tmp, []byte(content), mode); err != nil {
-		return err
+		// the service may only be allowed to write the file itself (e.g. /etc/boxvector.yml),
+		// not to create new files next to it: write in place instead
+		return os.WriteFile(path, []byte(content), mode)
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return os.WriteFile(path, []byte(content), mode)
+	}
+	return nil
 }
 
 func (s *store) snapshot(content string) (string, error) {

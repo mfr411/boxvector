@@ -17,7 +17,8 @@ function group(L){var names={};L.forEach(function(x){names[x.n]=1});var o=[];
 function state(x){return x.up?'running':x.dis?'disabled':'no carrier'}
 function draw(){
   var k=q.value.toLowerCase(),m=f.value,n=0,h='';
-  group(data).forEach(function(x){
+  var sd=window.bvSortState&&window.bvSortState('ift'),src=data.slice();if(sd)src.sort(function(a,b){var r=window.bvSortCmp(a.n,b.n);return sd==='d'?-r:r});
+  group(src).forEach(function(x){
     if(m==='up'&&!x.up||m==='down'&&x.up)return;
     if(k&&(x.n+' '+x.type+' '+x.mac+' '+x.drv+' '+x.v4.join(' ')+' '+x.v6.join(' ')).toLowerCase().indexOf(k)<0)return;
     n++;var r=x.r||{tx:0,rx:0,txp:0,rxp:0};
@@ -49,5 +50,6 @@ function poll(){
   }).catch(function(){});
 }
 q.addEventListener('input',draw);f.addEventListener('change',draw);
+window.bvRedraw=draw;
 poll();setInterval(poll,2000);
 })();

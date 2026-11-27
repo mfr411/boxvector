@@ -10,7 +10,7 @@ User=boxvector
 Group=boxvector
 # bird group: write /etc/bird and talk to /run/bird/bird.ctl
 SupplementaryGroups=bird shadow
-ExecStart=/usr/bin/boxvector web -c /etc/boxvector/boxvector.yml \
+ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml \
   --listen 0.0.0.0:6969 --state-dir /var/lib/boxvector/web \
   --auth-file /etc/boxvector/web.users
 Restart=on-failure
@@ -20,7 +20,7 @@ StateDirectory=boxvector
 UMask=0027
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/etc/bird /etc/boxvector /var/lib/boxvector -/run/bird
+ReadWritePaths=/etc/bird /etc/boxvector /etc/boxvector.yml /var/lib/boxvector -/run/bird
 ProtectHome=yes
 PrivateTmp=yes
 PrivateDevices=yes

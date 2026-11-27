@@ -1,12 +1,13 @@
 {{define "body"}}{{with .Data}}
+<form id="cfg" method="post" action="/config/review"><input type="hidden" name="csrf" value="{{$.CSRF}}">
+<div class="tools"><span class="mono cfile">{{.File}}</span><span id="cdirty" class="dirty" hidden>modified</span>
+<span class="sumc"><button type="button" id="crev" disabled>Revert</button><button class="pri" id="csave" disabled title="Ctrl+S">Review changes</button></span></div>
 {{if .Err}}<p class="err">{{.Err}}</p>{{end}}
-<div class="cols">
-<form class="grow" method="post" action="/config/review"><input type="hidden" name="csrf" value="{{$.CSRF}}">
-<div class="bar"><h2>Config</h2><span class="s mono hm">{{.File}}</span><button class="pri">Review changes</button></div>
-<textarea name="text" class="code" spellcheck="false" rows="32">{{.Text}}</textarea>
+<div class="cfgw"><div class="ed"><pre class="gut" id="cgut" aria-hidden="true">1</pre><textarea id="ctext" name="text" class="code" spellcheck="false" wrap="off">{{.Text}}</textarea></div>
+<div class="snp"><div class="snh">Snapshots</div><div class="snl">
+{{range .Snaps}}<div class="snr"><span class="mono">{{snapt .}}</span><button type="submit" class="lk" formaction="/config/restore" name="snap" value="{{.}}" formnovalidate title="{{.}}">Restore</button></div>
+{{else}}<p class="s sn0">None yet. A snapshot is taken before every apply.</p>{{end}}</div></div></div>
 </form>
-<aside><h3>Snapshots</h3>
-{{range .Snaps}}<form method="post" action="/config/restore"><input type="hidden" name="csrf" value="{{$.CSRF}}"><input type="hidden" name="snap" value="{{.}}"><button class="link mono">{{.}}</button></form>
-{{else}}<p class="s">None yet. A snapshot is taken before every apply.</p>{{end}}
-</aside></div>
+<div class="ds2 cst"><span id="cpos">Ln 1, Col 1</span><span id="clines"></span></div>
+<script src="/static/config.js" defer></script>
 {{end}}{{end}}

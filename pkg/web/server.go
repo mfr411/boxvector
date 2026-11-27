@@ -113,6 +113,12 @@ func Serve(opt Options) error {
 		},
 		"ago": func(t time.Time) string { return t.Format("02 Jan 15:04:05") },
 		"op":  func(b byte) string { return string(b) },
+		"snapt": func(n string) string {
+			if tm, err := time.ParseInLocation("20060102-150405", n[:15], time.Local); err == nil && len(n) >= 15 {
+				return tm.Format("02 Jan 15:04:05")
+			}
+			return n
+		},
 	}
 	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "config", "review", "routes", "logs", "interfaces"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))

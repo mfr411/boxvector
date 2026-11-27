@@ -96,7 +96,7 @@ The package:
 - installs `/usr/bin/boxvector` and the `boxvector-web` systemd service
   (installed, not started);
 - creates the system user `boxvector` and adds it to the `bird` group;
-- creates `/etc/boxvector/boxvector.yml` from an example (never overwritten
+- creates `/etc/boxvector.yml` from an example (never overwritten
   on upgrade) and `/var/lib/boxvector/`;
 - makes `/etc/bird` writable for the `bird` group.
 
@@ -110,7 +110,7 @@ boxvector version
 
 ## 2. Configure
 
-Edit `/etc/boxvector/boxvector.yml`:
+Edit `/etc/boxvector.yml`:
 
 ```yaml
 asn: 65530
@@ -148,20 +148,20 @@ All options are listed in [docs/configuration.md](docs/configuration.md)
 Test without touching BIRD (generates and validates only):
 
 ```sh
-sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml --dry-run
+sudo -u boxvector boxvector generate -c /etc/boxvector.yml --dry-run
 ```
 
 Apply (writes `/etc/bird/`, validates with `bird -p`, reloads BIRD):
 
 ```sh
-sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml
+sudo -u boxvector boxvector generate -c /etc/boxvector.yml
 sudo birdc show protocols
 ```
 
 Keep IRR/PeeringDB data fresh, e.g. every 6 hours:
 
 ```sh
-echo '0 */6 * * * boxvector /usr/bin/boxvector generate -c /etc/boxvector/boxvector.yml' \
+echo '0 */6 * * * boxvector /usr/bin/boxvector generate -c /etc/boxvector.yml' \
   | sudo tee /etc/cron.d/boxvector
 ```
 
@@ -202,7 +202,7 @@ In the editor add `--trust-proxy` so the real client IP and HTTPS are used:
 ```ini
 [Service]
 ExecStart=
-ExecStart=/usr/bin/boxvector web -c /etc/boxvector/boxvector.yml \
+ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml \
   --listen 127.0.0.1:8180 --state-dir /var/lib/boxvector/web \
   --auth-file /etc/boxvector/web.users --trust-proxy
 ```
@@ -252,7 +252,7 @@ Both use the same `boxvector.yml`; nothing in your config has to change.
 Check which one boxvector sees (the first log lines of every run):
 
 ```sh
-sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml --dry-run 2>&1 | grep 'BIRD version'
+sudo -u boxvector boxvector generate -c /etc/boxvector.yml --dry-run 2>&1 | grep 'BIRD version'
 # level=info msg="BIRD version 2.0.12"
 ```
 
@@ -273,7 +273,7 @@ sudo apt install bird3
 sudo dpkg-reconfigure boxvector
 
 # 5. regenerate for BIRD 3 and check the sessions
-sudo -u boxvector boxvector generate -c /etc/boxvector/boxvector.yml
+sudo -u boxvector boxvector generate -c /etc/boxvector.yml
 sudo systemctl restart bird
 sudo birdc show protocols
 ```
@@ -290,7 +290,7 @@ run `generate` again and restart `bird`. Or restore the backup from step 1.
 
 ```sh
 sudo apt install ./boxvector_<new-version>_amd64.deb   # config kept, service restarted
-sudo apt remove boxvector                              # keeps /etc/boxvector
+sudo apt remove boxvector                              # keeps /etc/boxvector.yml and /etc/boxvector/
 sudo apt purge boxvector                               # also deletes config, snapshots and the user
 ```
 
@@ -343,7 +343,7 @@ Available Commands:
   web         Run the web UI
 
 Flags:
-  -c, --config string   YAML configuration file (default "/etc/boxvector/boxvector.yml")
+  -c, --config string   YAML configuration file (default "/etc/boxvector.yml")
   -d, --dry-run         Don't modify configuration
   -h, --help            help for boxvector
       --lock string     Lock file (check disabled if empty)

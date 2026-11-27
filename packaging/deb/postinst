@@ -9,9 +9,14 @@ if [ "$1" = configure ]; then
   install -d -o boxvector -g boxvector -m 0750 /etc/boxvector /var/lib/boxvector /var/lib/boxvector/cache
   # files written by an earlier root run must stay writable by the service
   for f in /var/lib/boxvector/status.html; do [ -e "$f" ] && chown boxvector:boxvector "$f" || true; done
-  if [ ! -e /etc/boxvector/boxvector.yml ]; then
-    install -o boxvector -g boxvector -m 0640 /usr/share/boxvector/boxvector.yml.example /etc/boxvector/boxvector.yml
+  # earlier releases kept the config in /etc/boxvector/: move it, never overwrite
+  if [ ! -e /etc/boxvector.yml ] && [ -f /etc/boxvector/boxvector.yml ]; then
+    mv /etc/boxvector/boxvector.yml /etc/boxvector.yml
   fi
+  if [ ! -e /etc/boxvector.yml ]; then
+    install -o boxvector -g boxvector -m 0640 /usr/share/boxvector/boxvector.yml.example /etc/boxvector.yml
+  fi
+  chown boxvector:boxvector /etc/boxvector.yml && chmod 0640 /etc/boxvector.yml || true
   # let group bird (boxvector) write generated config
   if [ -d /etc/bird ]; then
     chgrp -R bird /etc/bird && chmod -R g+rwX /etc/bird && chmod 2775 /etc/bird || true
@@ -21,7 +26,7 @@ if [ "$1" = configure ]; then
     systemctl try-restart boxvector-web.service >/dev/null 2>&1 || true
   fi
   if [ ! -s /etc/boxvector/web.users ]; then
-    echo "boxvector: edit /etc/boxvector/boxvector.yml, then create a web user:"
+    echo "boxvector: edit /etc/boxvector.yml, then create a web user:"
     echo "  sudo -u boxvector boxvector web passwd admin --auth-file /etc/boxvector/web.users"
     echo "  sudo systemctl enable --now boxvector-web"
   fi

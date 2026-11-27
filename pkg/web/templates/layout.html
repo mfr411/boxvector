@@ -1,7 +1,7 @@
 {{define "layout"}}<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow"><title>{{.Title}} · boxvector</title>
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script></head>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg"><link rel="stylesheet" href="/static/app.css"><script src="/static/app.js" defer></script><script src="/static/sort.js" defer></script></head>
 <body class="{{if .User}}app{{else}}guest{{end}}">{{if .User}}
 <div class="ttl"><i></i><span>{{.Router.Hostname}}{{if .Router.ASN}} (AS{{.Router.ASN}}){{end}} - boxvector - {{.Version}}</span><span class="g">{{.User}}</span></div>
 <div class="st"><div class="g"><label>Uptime:</label><span class="fld w104" id="s-up">-</span><label>Sessions up:</label><span class="fld w48" id="s-su">-</span><label>Last apply:</label><span class="fld w70" id="s-la">-</span><label>Date:</label><span class="fld" id="s-dt">-</span></div></div>
