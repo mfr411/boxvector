@@ -349,3 +349,5 @@ button.pri:disabled{background:#c9ccee;border-color:#c9ccee;color:#fff;opacity:1
 th.srt{cursor:pointer;user-select:none}th.srt:hover{background:#eceef3}
 th.srt.sa:after,th.srt.sd:after{content:"";display:inline-block;margin-left:6px;border:4px solid transparent;vertical-align:middle}
 th.srt.sa:after{border-bottom:5px solid #5a63b8;border-top:0}th.srt.sd:after{border-top:5px solid #5a63b8;border-bottom:0}
+/* status bar: fields sit on the right */
+.st .g{margin-left:auto;width:auto;justify-content:flex-end}
