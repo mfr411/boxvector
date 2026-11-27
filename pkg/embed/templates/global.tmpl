@@ -11,12 +11,18 @@ define LOCALv4 = [
 {{ BirdSet .Prefixes4 }}
 ];
 {{- end }}
-{{ if or .Prefixes4 .Kernel.Statics4 .Kernel.StaticList4 }}
+{{ if .Prefixes4 }}
 protocol static static4 {
   ipv4;
   {{- range $i, $prefix := .Prefixes4 }}
   route {{ $prefix }} reject;
   {{- end }}
+}
+{{- end }}
+{{ if or .Kernel.Statics4 .Kernel.StaticList4 }}
+# user static routes: kept apart from the originated prefixes above, which are never exported to the kernel
+protocol static static_rt4 {
+  ipv4;
   {{- range $prefix, $nexthop := MapDeref .Kernel.Statics4 }}
   route {{ $prefix }} via {{ $nexthop }};
   {{- end }}
@@ -34,12 +40,18 @@ define LOCALv6 = [
 {{ BirdSet .Prefixes6 }}
 ];
 {{- end }}
-{{ if or .Prefixes6 .Kernel.Statics6 .Kernel.StaticList6 }}
+{{ if .Prefixes6 }}
 protocol static static6 {
   ipv6;
   {{- range $i, $prefix := .Prefixes6 }}
   route {{ $prefix }} reject;
   {{- end }}
+}
+{{- end }}
+{{ if or .Kernel.Statics6 .Kernel.StaticList6 }}
+# user static routes: kept apart from the originated prefixes above, which are never exported to the kernel
+protocol static static_rt6 {
+  ipv6;
   {{- range $prefix, $nexthop := .Kernel.Statics6 }}
   route {{ $prefix }} via {{ $nexthop }};
   {{- end }}
