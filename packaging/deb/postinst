@@ -7,6 +7,8 @@ if [ "$1" = configure ]; then
   fi
   getent group bird >/dev/null && adduser --quiet boxvector bird || true
   install -d -o boxvector -g boxvector -m 0750 /etc/boxvector /var/lib/boxvector /var/lib/boxvector/cache
+  # files written by an earlier root run must stay writable by the service
+  for f in /var/lib/boxvector/status.html; do [ -e "$f" ] && chown boxvector:boxvector "$f" || true; done
   if [ ! -e /etc/boxvector/boxvector.yml ]; then
     install -o boxvector -g boxvector -m 0640 /usr/share/boxvector/boxvector.yml.example /etc/boxvector/boxvector.yml
   fi

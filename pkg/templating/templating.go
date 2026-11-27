@@ -5,6 +5,7 @@ import (
 	"fmt"
 	htmltemplate "html/template"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -317,20 +318,30 @@ func WriteVRRPConfig(instances map[string]*config.VRRPInstance, keepalivedConfig
 	}
 }
 
-// WriteUIFile renders and writes the web UI file
+// WriteUIFile renders and writes the web UI file. It writes a temp file and
+// renames it over the target, so a stale file owned by another user (for
+// example one created by a root run) cannot block the update.
 func WriteUIFile(config *config.Config) {
-	// Create the UI output file
-	log.Debug("Creating UI output file")
-	uiFileObj, err := os.Create(config.WebUIFile)
+	dst := config.WebUIFile
+	tmp, err := os.CreateTemp(filepath.Dir(dst), ".status-*.tmp")
 	if err != nil {
 		log.Fatalf("Create UI output file: %v", err)
 	}
-	log.Debug("Finished creating UI file")
-
-	// Render the UI template and write to disk
+	defer os.Remove(tmp.Name())
 	log.Debug("Writing UI file")
-	if err := uiTemplate.ExecuteTemplate(uiFileObj, "ui.tmpl", config); err != nil {
+	if err := uiTemplate.ExecuteTemplate(tmp, "ui.tmpl", config); err != nil {
+		tmp.Close()
 		log.Fatalf("Execute UI template: %v", err)
+	}
+	if err := tmp.Chmod(0o644); err != nil {
+		tmp.Close()
+		log.Fatalf("Create UI output file: %v", err)
+	}
+	if err := tmp.Close(); err != nil {
+		log.Fatalf("Write UI output file: %v", err)
+	}
+	if err := os.Rename(tmp.Name(), dst); err != nil {
+		log.Fatalf("Create UI output file: %v", err)
 	}
 	log.Debug("Finished writing UI file")
 }
