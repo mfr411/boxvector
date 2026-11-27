@@ -2,6 +2,8 @@ package web
 
 import (
 	"html/template"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -124,5 +126,21 @@ func TestListIfacesHasLoopback(t *testing.T) {
 	}
 	if lo == nil || lo.Type != "Loopback" || lo.MTU == 0 {
 		t.Fatalf("lo not read from host: %+v", lo)
+	}
+}
+
+func TestSessionsSurviveRestart(t *testing.T) {
+	dir := t.TempDir()
+	a := newAuthOpt(Options{StateDir: dir})
+	tok := "tok123"
+	a.mu.Lock()
+	a.sessions[tokKey(tok)] = &session{user: "root", csrf: "c", created: time.Now(), seen: time.Now()}
+	a.saveLocked()
+	a.mu.Unlock()
+	b := newAuthOpt(Options{StateDir: dir})
+	r := httptest.NewRequest("GET", "/", nil)
+	r.AddCookie(&http.Cookie{Name: sessionCookie, Value: tok})
+	if s, _ := b.get(r); s == nil || s.user != "root" {
+		t.Fatal("session lost after restart")
 	}
 }

@@ -2,12 +2,15 @@ package web
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -17,8 +20,8 @@ import (
 
 const (
 	sessionCookie = "bv_session"
-	sessionIdle   = 60 * time.Minute
-	sessionMax    = 12 * time.Hour
+	sessionIdle   = 8 * time.Hour
+	sessionMax    = 7 * 24 * time.Hour
 	maxFails      = 5
 	failWindow    = 10 * time.Minute
 )
@@ -36,6 +39,8 @@ type auth struct {
 	system     bool   // verify against the server accounts (/etc/shadow)
 	shadow     string // shadow file path
 
+	store    string // sessions file; empty = memory only
+	lastSave time.Time
 	mu       sync.Mutex
 	sessions map[string]*session
 	fails    map[string][]time.Time
@@ -48,6 +53,10 @@ func newAuth(file string, trustProxy bool) *auth {
 func newAuthOpt(o Options) *auth {
 	a := newAuth(o.AuthFile, o.TrustProxy)
 	a.system, a.shadow = o.SystemAuth, "/etc/shadow"
+	if o.StateDir != "" {
+		a.store = filepath.Join(o.StateDir, "sessions.json")
+		a.load()
+	}
 	return a
 }
 
@@ -163,8 +172,9 @@ func (a *auth) login(ip, user, password string) (*session, string, bool) {
 	s := &session{user: user, csrf: randHex(16), created: time.Now(), seen: time.Now()}
 	tok := randHex(32)
 	a.mu.Lock()
-	a.sessions[tok] = s
+	a.sessions[tokKey(tok)] = s
 	delete(a.fails, ip)
+	a.saveLocked()
 	a.mu.Unlock()
 	return s, tok, true
 }
@@ -176,24 +186,82 @@ func (a *auth) get(r *http.Request) (*session, string) {
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	s := a.sessions[c.Value]
+	k := tokKey(c.Value)
+	s := a.sessions[k]
 	if s == nil {
 		return nil, ""
 	}
 	if time.Since(s.seen) > sessionIdle || time.Since(s.created) > sessionMax {
-		delete(a.sessions, c.Value)
+		delete(a.sessions, k)
+		a.saveLocked()
 		return nil, ""
 	}
 	s.seen = time.Now()
+	if time.Since(a.lastSave) > time.Minute {
+		a.saveLocked()
+	}
 	return s, c.Value
 }
 
 func (a *auth) logout(tok string) {
 	a.mu.Lock()
-	delete(a.sessions, tok)
+	delete(a.sessions, tokKey(tok))
+	a.saveLocked()
 	a.mu.Unlock()
 }
 
 func csrfOK(s *session, r *http.Request) bool {
 	return subtle.ConstantTimeCompare([]byte(r.PostFormValue("csrf")), []byte(s.csrf)) == 1
+}
+
+// tokKey is what is kept in memory and on disk: a hash, never the raw cookie token.
+func tokKey(tok string) string {
+	h := sha256.Sum256([]byte(tok))
+	return hex.EncodeToString(h[:])
+}
+
+type savedSession struct {
+	User    string    `json:"u"`
+	CSRF    string    `json:"c"`
+	Created time.Time `json:"t"`
+	Seen    time.Time `json:"s"`
+}
+
+// load restores sessions so a service restart does not log everyone out.
+func (a *auth) load() {
+	b, err := os.ReadFile(a.store)
+	if err != nil {
+		return
+	}
+	var m map[string]savedSession
+	if json.Unmarshal(b, &m) != nil {
+		return
+	}
+	for k, v := range m {
+		if time.Since(v.Seen) <= sessionIdle && time.Since(v.Created) <= sessionMax {
+			a.sessions[k] = &session{user: v.User, csrf: v.CSRF, created: v.Created, seen: v.Seen}
+		}
+	}
+}
+
+// saveLocked persists sessions atomically (caller holds a.mu).
+func (a *auth) saveLocked() {
+	a.lastSave = time.Now()
+	if a.store == "" {
+		return
+	}
+	m := make(map[string]savedSession, len(a.sessions))
+	for k, s := range a.sessions {
+		if time.Since(s.seen) <= sessionIdle && time.Since(s.created) <= sessionMax {
+			m[k] = savedSession{s.user, s.csrf, s.created, s.seen}
+		}
+	}
+	b, err := json.Marshal(m)
+	if err != nil {
+		return
+	}
+	tmp := a.store + ".tmp"
+	if os.WriteFile(tmp, b, 0o600) == nil {
+		_ = os.Rename(tmp, a.store)
+	}
 }
