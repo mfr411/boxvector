@@ -268,6 +268,7 @@ func RunNetHelper(sock string) error {
 	h := &netHelper{ip: findIP(), file: netStateFile}
 	h.load()
 	go h.restore()
+	im := newIfMgr(h)
 	mux := http.NewServeMux()
 	reply := func(w http.ResponseWriter, code int, v any) {
 		w.Header().Set("Content-Type", "application/json")
@@ -300,6 +301,8 @@ func RunNetHelper(sock string) error {
 		}
 		reply(w, 200, map[string]bool{"ok": true})
 	})
+	mux.HandleFunc("POST /iface", im.handle)
+	mux.HandleFunc("GET /iface", im.status)
 	fmt.Fprintf(os.Stderr, "boxvector net helper on %s\n", sock)
 	return (&http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}).Serve(ln)
 }

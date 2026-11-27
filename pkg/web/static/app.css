@@ -380,3 +380,6 @@ button.ib.on,button.ib[aria-pressed=true]{background:#e8eefb;border-color:#9db4e
 tr.cfg.dis td{color:#888}.cmt{margin-left:6px}#rtb[hidden]{display:none}
 .vh{margin:14px 0 6px;font-size:13px;font-weight:600;color:#333}
 #vth,#vif,#vlc,#vbf{table-layout:auto;width:100%;min-width:0}.vh+.tw{overflow-x:auto}
+[hidden]{display:none!important}
+.ifbn{display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:6px 10px;border:1px solid #e0c36a;background:#fff8e1;border-radius:5px;font-size:13px}
+.ifbn span{flex:1}

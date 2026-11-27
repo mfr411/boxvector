@@ -124,7 +124,7 @@ func Serve(opt Options) error {
 			return n
 		},
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal", "kroute"} {
+	for _, p := range []string{"login", "peers", "peer_new", "peer_delete", "peer_toggle", "peer_comment", "route_new", "route_act", "route_comment", "config", "review", "routes", "logs", "interfaces", "vpp", "terminal", "kroute", "ifedit"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -136,6 +136,12 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /logout", s.authed(s.logoutPost))
 	mux.HandleFunc("GET /{$}", s.authed(s.peersPage))
 	mux.HandleFunc("GET /interfaces", s.authed(s.ifacesPage))
+	mux.HandleFunc("GET /ifaces/new", s.authed(s.ifNewPage))
+	mux.HandleFunc("POST /ifaces/new", s.authed(s.ifPost))
+	mux.HandleFunc("GET /ifaces/act", s.authed(s.ifActPage))
+	mux.HandleFunc("POST /ifaces/act", s.authed(s.ifPost))
+	mux.HandleFunc("POST /api/ifconfirm", s.authed(s.ifConfirm))
+	mux.HandleFunc("GET /api/ifstatus", s.authed(s.ifStatus))
 	mux.HandleFunc("GET /api/ifaces", s.authed(s.ifacesAPI))
 	mux.HandleFunc("GET /vpp", s.authed(s.vppPage))
 	mux.HandleFunc("GET /api/vpp", s.authed(s.vppAPI))
