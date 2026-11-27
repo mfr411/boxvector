@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="mfr411/boxvector"
 MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; VERSION="latest"
-WEB_USER="admin"; NO_BV=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0
+WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0
 VPP_REPO_KEY=/usr/share/keyrings/fdio-release.gpg
 BIRD3_KEY=/usr/share/keyrings/cznic-labs-pkg.gpg
 
@@ -33,7 +33,9 @@ boxvector installer
   --bird 2|3|keep          BIRD major to install (default 2; keep = leave what is installed)
   --vpp / --no-vpp         (custom) install VPP + linux-cp
   --web / --no-web         (custom) enable web UI and create the admin user
-  --vpp-nic PCI_ADDR       add a DPDK NIC to VPP, e.g. 0000:03:00.0 (repeatable; must already be bound to vfio-pci/uio)
+  --vpp-nic PCI[@GBPS]     add a DPDK NIC to VPP, e.g. 0000:03:00.0@25 (repeatable; must already be bound to vfio-pci/uio).
+                           @GBPS = link speed, only needed when it cannot be detected
+  --estimate               print the traffic capacity estimate for this machine and exit (no root, no changes)
   --vpp-reserve N          physical cores kept for the OS + BIRD + boxvector (default 1)
   --vpp-smt                also use hyper-thread siblings as VPP workers (default: physical cores only)
   --vpp-workers N          cap the number of VPP workers (default: all remaining cores of the NIC's NUMA node)
@@ -55,7 +57,8 @@ while [ $# -gt 0 ]; do
     --bird) BIRD=${2:?}; shift 2 ;;
     --vpp) VPP=1; shift ;;   --no-vpp) VPP=0; shift ;;
     --web) WEB=1; shift ;;   --no-web) WEB=0; shift ;;
-    --vpp-nic) VPP_NICS+=("${2:?}"); shift 2 ;;
+    --vpp-nic) _v=${2:?}; VPP_NICS+=("${_v%@*}"); [[ "$_v" == *@* ]] && NIC_SPEED["${_v%@*}"]=$(( ${_v#*@} * 1000 )); shift 2 ;;
+    --estimate) ESTIMATE=1; shift ;;
     --vpp-reserve) VPP_RESERVE=${2:?}; shift 2 ;;
     --vpp-smt) VPP_SMT=1; shift ;;
     --vpp-workers) VPP_WORKERS=${2:?}; shift 2 ;;
@@ -72,7 +75,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-[ "$(id -u)" = 0 ] || [ "$DRY" = 1 ] || die "run as root (sudo)"
+[ "$(id -u)" = 0 ] || [ "$DRY" = 1 ] || [ "$ESTIMATE" = 1 ] || die "run as root (sudo)"
 command -v apt-get >/dev/null || die "apt-get not found: Debian/Ubuntu only"
 
 # ---------- OS check ----------
@@ -90,6 +93,7 @@ case "$(dpkg --print-architecture)" in
   *) die "unsupported architecture: $(dpkg --print-architecture)" ;;
 esac
 
+[ "$ESTIMATE" = 1 ] && { MODE=${MODE:-all}; VPP=1; }
 # ---------- choose what to install ----------
 ask() { # ask "question" default(y/n)
   local a; read -r -p "$1 " a </dev/tty || a=""; echo "${a:-$2}"
@@ -135,7 +139,7 @@ check_nic() {
   fi
   case "$drv" in vfio-pci|uio_pci_generic|igb_uio) ;; *) [ "$FORCE" = 1 ] || die "$pci uses driver '$drv'; bind it to vfio-pci/uio_pci_generic first" ;; esac
 }
-for n in "${VPP_NICS[@]}"; do check_nic "$n"; done
+[ "$ESTIMATE" = 1 ] || for n in "${VPP_NICS[@]}"; do check_nic "$n"; done
 
 # ---------- helpers ----------
 export DEBIAN_FRONTEND=noninteractive
@@ -145,9 +149,11 @@ pkg_installed() { local o; o=$(dpkg -s "$1" 2>/dev/null || true); [[ "$o" == *"S
 has_candidate() { local o; o=$(apt-cache policy "$1" 2>/dev/null || true); [[ "$o" =~ Candidate:\ [0-9] ]]; }
 need() { local p=(); for x in "$@"; do pkg_installed "$x" || p+=("$x"); done; [ ${#p[@]} -eq 0 ] || run $APT install "${p[@]}"; }
 
+if [ "$ESTIMATE" != 1 ]; then
 log "base packages"
 run apt-get update -qq
 need ca-certificates curl gnupg openssl procps
+fi
 
 # ---------- BIRD ----------
 install_bird() {
@@ -170,8 +176,7 @@ install_bird() {
     run $APT install bird2 bgpq4
   fi
 }
-log "BIRD ${BIRD}"
-install_bird
+if [ "$ESTIMATE" != 1 ]; then log "BIRD ${BIRD}"; install_bird; fi
 
 # ---------- VPP ----------
 install_vpp() {
@@ -234,22 +239,124 @@ vpp_cpu_plan() {
         w[++nw]=arr[1]; if (smt==1) for (a=2;a<=n;a++) sib[++ns]=arr[a]
         delete arr
       }
-      for (a=1;a<=ns;a++) w[++nw]=sib[a]
+      np=nw; for (a=1;a<=ns;a++) w[++nw]=sib[a]
       for (a=1;a<=nw;a++) for (b=a+1;b<=nw;b++) if (w[b]<w[a]) { v=w[a]; w[a]=w[b]; w[b]=v }
       if (maxw>0 && nw>maxw) nw=maxw
       for (a=1;a<=nr;a++) for (b=a+1;b<=nr;b++) if (res[b]+0<res[a]+0) { v=res[a]; res[a]=res[b]; res[b]=v }
-      printf "MAIN=%s\nWORKERS=%s\nNW=%d\nRESERVED=%s\n", res[1]+0, (nw>0?ranges(w,nw):""), nw, ranges(res,nr)
+      printf "MAIN=%s\nWORKERS=%s\nNW=%d\nRESERVED=%s\nNPHYS=%d\nNSMT=%d\n", res[1]+0, (nw>0?ranges(w,nw):""), nw, ranges(res,nr), (np<nw?np:nw), nw-(np<nw?np:nw)
     }' <<<"$topo"
+}
+
+
+hw_probe() {
+  local l base maxm
+  l=$(lscpu 2>/dev/null || true)
+  CPU_MODEL=$(sed -n 's/^Model name:[[:space:]]*//p' <<<"$l" | head -1 || true); [ -n "$CPU_MODEL" ] || CPU_MODEL="unknown CPU"
+  base=$(grep -oE '[0-9]+\.[0-9]+ ?GHz' <<<"$CPU_MODEL" | head -1 | tr -d ' GHz' || true)
+  maxm=$(awk -F: '/CPU max MHz/ {print int($2)}' <<<"$l" || true)
+  # sustained all-core clock: base from the model name, else 85% of max turbo, else 2.5 GHz
+  GHZ100=$(awk -v b="${base:-0}" -v m="${maxm:-0}" 'BEGIN{ if (b>0) print int(b*100); else if (m>0) print int(m*0.085); else print 250 }')
+  SOCKETS=$(awk -F: '/^Socket\(s\)/ {gsub(/ /,"",$2); print $2}' <<<"$l" || true); SOCKETS=${SOCKETS:-1}
+  NODES=$(find /sys/devices/system/node -maxdepth 1 -name 'node[0-9]*' 2>/dev/null | wc -l); [ "$NODES" -ge 1 ] || NODES=1
+  RAM_MB=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
+}
+
+# nic_probe PCI -> "<effective Mbit/s> <speed source> <pcie Mbit/s or 0>"
+nic_probe() {
+  local pci=$1 d=/sys/bus/pci/devices/$1 mb="" src="" net sp desc gt w pc=0
+  if [ -n "${NIC_SPEED[$pci]:-}" ]; then mb=${NIC_SPEED[$pci]}; src=given
+  else
+    net=$(ls "$d/net" 2>/dev/null | head -1 || true)
+    if [ -n "$net" ]; then
+      sp=$(cat "/sys/class/net/$net/speed" 2>/dev/null || echo -1)
+      if [ "${sp:-0}" -gt 0 ] 2>/dev/null; then mb=$sp; src=link; fi
+    fi
+    if [ -z "$mb" ] && command -v lspci >/dev/null; then
+      desc=$(lspci -s "${pci#0000:}" 2>/dev/null || true)
+      case "$desc" in
+        *100G*|*100GbE*|*100-G*) mb=100000 ;; *50G*|*50GbE*) mb=50000 ;; *40G*|*40GbE*|*XL710*) mb=40000 ;;
+        *25G*|*25GbE*|*XXV710*) mb=25000 ;; *10G*|*10-Gigabit*|*10GbE*|*82599*|*X520*|*X710*|*X550*) mb=10000 ;;
+      esac
+      [ -z "$mb" ] || src=pci-id
+    fi
+    [ -n "$mb" ] || { mb=10000; src=assumed; }
+  fi
+  gt=$(sed -n 's/^\([0-9.]*\) GT\/s.*/\1/p' "$d/current_link_speed" 2>/dev/null | head -1 || true)
+  w=$(cat "$d/current_link_width" 2>/dev/null || true)
+  if [ -n "$gt" ] && [ -n "$w" ]; then
+    pc=$(awk -v g="$gt" -v w="$w" 'BEGIN{ e=(g>=8?128/130:0.8); printf "%d", g*w*e*1000 }')
+    [ "$pc" -ge "$mb" ] || mb=$pc    # the slot is slower than the port: PCIe is the limit
+  fi
+  echo "$mb $src $pc"
+}
+
+# Capacity estimate. Conservative model for VPP L3 forwarding (IPv4/IPv6, linux-cp, no ACL/NAT):
+#   ~2 Mpps per GHz per physical core (SMT sibling counts 25%), line rate 1 pkt = frame + 20 B overhead,
+#   forwarded Gbit/s is capped by the sum of NIC speeds and each NIC's PCIe slot.
+vpp_report() {
+  local MAIN="" WORKERS="" NW=0 NPHYS=0 NSMT=0 RESERVED="" pci nm mb src pc lines="" d note=""
+  local sel=("${VPP_NICS[@]}")
+  eval "$(vpp_cpu_plan)"
+  hw_probe
+  if [ ${#sel[@]} -eq 0 ]; then
+    for d in /sys/bus/pci/devices/*; do [ -d "$d/net" ] && sel+=("$(basename "$d")"); done
+    note="no --vpp-nic given: counting every NIC found (choose with --vpp-nic PCI[@Gbps])"
+  fi
+  for pci in "${sel[@]}"; do
+    read -r mb src pc < <(nic_probe "$pci")
+    nm=$(ls "/sys/bus/pci/devices/$pci/net" 2>/dev/null | head -1 || true)
+    lines+="$pci ${nm:--} $mb $src $pc"$'\n'
+  done
+  BV_NICS=$lines awk -v model="$CPU_MODEL" -v ghz="$GHZ100" -v nphys="$NPHYS" -v nsmt="$NSMT" -v main="$MAIN" -v ram="$RAM_MB" \
+      -v sock="$SOCKETS" -v nodes="$NODES" -v res="$RESERVED" -v note="$note" '
+    function rate(g) { return (g>=1000 ? sprintf("%.1f Gbit/s", g/1000) : sprintf("%d Mbit/s", g)) }
+    function tp(pps, sz) { return pps * sz * 8 / 1000 }
+    BEGIN {
+      eff = nphys + 0.25*nsmt; cpu = eff * 2 * ghz/100            # Mpps
+      n = split(ENVIRON["BV_NICS"], L, "\n"); tot = 0; cnt = 0
+      for (i=1;i<=n;i++) if (L[i] != "") { split(L[i], f, " "); cnt++; nm[cnt]=f[1]; ifn[cnt]=f[2]; sp[cnt]=f[3]; sr[cnt]=f[4]; pcx[cnt]=f[5]; tot += f[3] }
+      printf "\nCapacity estimate (VPP L3 forwarding, IPv4+IPv6, conservative)\n"
+      printf "  CPU     : %s, %d socket(s), %d NUMA node(s)\n", model, sock, nodes
+      printf "            %d forwarding worker(s): %d physical%s @ ~%.2f GHz, cores kept for OS/BIRD: %s\n", nphys+nsmt, nphys, (nsmt>0 ? " + " nsmt " SMT" : ""), ghz/100, res
+      printf "            -> ~%.0f Mpps (all flows spread over workers by RSS)\n", cpu
+      printf "  RAM     : %.1f GB\n", ram/1024
+      if (ram >= 15000)      r = "full IPv4+IPv6 table with several upstreams (multi-million routes)"
+      else if (ram >= 7500)  r = "full IPv4+IPv6 table (~1.3M routes)"
+      else if (ram >= 3500)  r = "one full IPv4 table, IPv6 table"
+      else                   r = "partial tables / default route only (hundreds of thousands of routes)"
+      printf "            -> FIB headroom: %s\n", r
+      if (cnt == 0) { printf "  NIC     : none found (VPP needs a DPDK-capable NIC bound to vfio-pci)\n"; exit }
+      for (i=1;i<=cnt;i++) printf "  NIC     : %s %s %s (%s)%s\n", nm[i], (ifn[i]=="-"?"":ifn[i]), rate(sp[i]), sr[i], (pcx[i]>0 ? ", PCIe slot " rate(pcx[i]) : "")
+      if (note != "") printf "            %s\n", note
+      printf "            -> %s receive capacity in total\n", rate(tot)
+      printf "  Forwarding capacity (one direction, sum of all ports):\n"
+      split("64 360 1518", S, " "); split("64-byte packets|IMIX (~360 B avg)|1518-byte packets", T, "|")
+      for (k=1;k<=3;k++) {
+        sz=S[k]; lp = tot*1e6/((sz+20)*8)/1e6                       # Mpps the links can carry
+        pps = (cpu < lp ? cpu : lp); lim = (cpu < lp ? "CPU" : "NIC")
+        printf "    %-20s %7.1f Mpps  %8.1f Gbit/s   limited by %s\n", T[k], pps, tp(pps, sz), lim
+      }
+      imixlp = tot*1e6/((360+20)*8)/1e6
+      if (cpu < imixlp)      printf "  Advice  : CPU is the bottleneck at IMIX: faster/more cores add capacity.\n"
+      else                   printf "  Advice  : NICs are the bottleneck at IMIX: more/faster ports add capacity (CPU has room).\n"
+      printf "  Note    : estimate, not a benchmark. One flow stays on one worker (~%.0f Mpps max), measure with TRex/iperf3.\n\n", 2*ghz/100
+    }' </dev/null
 }
 
 write_vpp_config() {
   local f=/etc/vpp/startup.conf want cpu_block="" dpdk_block="" plug_dpdk=disable
-  local MAIN="" WORKERS="" NW=0 RESERVED=""
+  local MAIN="" WORKERS="" NW=0 RESERVED="" NPHYS=0 NSMT=0
+  hw_probe
   eval "$(vpp_cpu_plan)"
   local ram_mb; ram_mb=$(awk '/MemTotal/ {print int($2/1024)}' /proc/meminfo)
   local nq=$NW; [ "$nq" -ge 1 ] || nq=1
   # buffers scale with workers; heap by RAM
-  local buffers=$(( 32768 * nq )); [ "$buffers" -ge 65536 ] || buffers=65536
+  # fastest NIC decides ring and buffer depth: more in flight per queue at 25G+ (absorbs bursts without drops)
+  local maxmb=0 pn pmb _s _p; for pn in "${VPP_NICS[@]}"; do read -r pmb _s _p < <(nic_probe "$pn"); [ "$pmb" -le "$maxmb" ] || maxmb=$pmb; done
+  local desc=2048 per_q=32768
+  [ "$maxmb" -ge 25000 ] && { desc=4096; per_q=65536; }
+  [ "$maxmb" -ge 100000 ] && per_q=131072
+  local buffers=$(( per_q * nq )); [ "$buffers" -ge 65536 ] || buffers=65536
   local heap=256; [ "$ram_mb" -ge 3500 ] && heap=512; [ "$ram_mb" -ge 7500 ] && heap=1024; [ "$ram_mb" -ge 15000 ] && heap=2048; [ "$ram_mb" -ge 60000 ] && heap=4096
   # hugepages (2 MB): buffers*2.3KB + heap + statseg + slack, never more than 40% of RAM
   local seg=256; [ "$ram_mb" -ge 4000 ] || seg=64
@@ -270,7 +377,7 @@ write_vpp_config() {
     plug_dpdk=enable
     dpdk_block=$'dpdk {\n  uio-driver vfio-pci\n  no-multi-seg\n  # each NIC gets one RX/TX queue per worker (RSS spreads flows over all cores)'
     local n; for n in "${VPP_NICS[@]}"; do
-      dpdk_block+=$'\n'"  dev $n {"$'\n'"    num-rx-queues $nq"$'\n'"    num-tx-queues $nq"$'\n'"    num-rx-desc 2048"$'\n'"    num-tx-desc 2048"$'\n'"  }"
+      dpdk_block+=$'\n'"  dev $n {"$'\n'"    num-rx-queues $nq"$'\n'"    num-tx-queues $nq"$'\n'"    num-rx-desc $desc"$'\n'"    num-tx-desc $desc"$'\n'"  }"
     done
     dpdk_block+=$'\n}'
   fi
@@ -357,7 +464,8 @@ UNIT
   fi
 }
 VPP_CONF_CHANGED=0; REBOOT_HINT=0; VPP_PLAN=""
-if [ "$VPP" = 1 ]; then log "VPP"; install_vpp; fi
+if [ "$ESTIMATE" = 1 ]; then vpp_report; exit 0; fi
+if [ "$VPP" = 1 ]; then log "VPP"; vpp_report; install_vpp; fi
 
 # ---------- boxvector ----------
 fetch_deb() {

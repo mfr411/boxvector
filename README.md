@@ -63,6 +63,13 @@ sudo bash install.sh --mode core     # boxvector + BIRD only
 | `--version X.Y.Z`, `--deb FILE\|URL` | pick a release or a local package |
 | `--dry-run`, `--yes` | preview only / no questions |
 
+**Capacity estimate.** `sudo bash install.sh --estimate` (also shown before every VPP install) prints
+what this machine can forward: CPU workers x clock gives Mpps, NIC speed (from the link, PCI ID or
+`--vpp-nic PCI@GBPS`) and the PCIe slot limit give Gbit/s, for 64 B, IMIX and 1518 B packets, plus which side
+is the bottleneck. RAM maps to FIB headroom. It is a conservative model for L3 forwarding without ACL/NAT, not a
+benchmark. On big machines the installer scales automatically: more workers, deeper NIC rings (4096 at 25G+)
+and more buffers (up to 131072 per queue at 100G).
+
 **CPU tuning.** The installer reads the CPU topology and gives VPP every
 core except the reserved ones: `main-core` and the OS/BIRD/boxvector stay on
 the first physical core, all other physical cores of the NIC's NUMA node become
