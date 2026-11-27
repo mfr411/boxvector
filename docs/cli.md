@@ -75,7 +75,6 @@ Flags:
       --allow-public       allow listening on a non-loopback address without TLS (default true)
       --auth-file string   user file (user:bcrypt per line, mode 600) (default "/etc/boxvector/web.users")
       --file-auth          sign in with --auth-file users (bcrypt) instead of the server accounts
-      --fleet-key string   SSH private key (mode 600) enabling centralized Debian/Ubuntu patching of other routers
   -h, --help               help for web
       --listen string      listen address (host:port) (default "0.0.0.0:6969")
       --state-dir string   directory for snapshots and history (default "/var/lib/boxvector")
