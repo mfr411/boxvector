@@ -5,7 +5,7 @@
 <body class="{{if .User}}app{{else}}guest{{end}}">{{if .User}}
 <div class="ttl"><span class="dot"></span><b>{{.Router.Hostname}}</b>{{if .Router.ASN}}<span>AS{{.Router.ASN}}</span>{{end}}<span>BIRD</span><span class="g">{{.User}}</span></div>
 <div class="wrap">
-<nav class="menu"><a href="/"{{if eq .Nav "peers"}} class="on"{{end}}>Peers</a><a href="/routes"{{if eq .Nav "routes"}} class="on"{{end}}>Routes</a><a href="/config"{{if eq .Nav "config"}} class="on"{{end}}>Config</a><a href="/patching"{{if eq .Nav "patching"}} class="on"{{end}}>Patching</a><a href="/logs"{{if eq .Nav "logs"}} class="on"{{end}}>Logs</a>
+<nav class="menu"><a href="/interfaces"{{if eq .Nav "interfaces"}} class="on"{{end}}>Interfaces</a><a href="/"{{if eq .Nav "peers"}} class="on"{{end}}>Peers</a><a href="/routes"{{if eq .Nav "routes"}} class="on"{{end}}>Routes</a><a href="/config"{{if eq .Nav "config"}} class="on"{{end}}>Config</a><a href="/patching"{{if eq .Nav "patching"}} class="on"{{end}}>Patching</a><a href="/logs"{{if eq .Nav "logs"}} class="on"{{end}}>Logs</a>
 <hr><form method="post" action="/logout"><input type="hidden" name="csrf" value="{{.CSRF}}"><button class="out">Sign out</button></form></nav>
 <div class="desk"><section class="win"><div class="wt"><span>{{.Title}}</span><span class="v">{{.Version}}</span></div><main>{{template "body" .}}</main>
 <div class="ft"><span>Boxvector {{.Version}}</span><span class="r">Inspired by <a href="https://github.com/natesales/pathvector" rel="noopener" target="_blank">Pathvector</a> (Nate Sales)</span></div></section></div>

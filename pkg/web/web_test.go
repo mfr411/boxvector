@@ -113,3 +113,16 @@ func TestPatchingTemplateRenders(t *testing.T) {
 		}
 	}
 }
+
+func TestListIfacesHasLoopback(t *testing.T) {
+	var lo *ifaceInfo
+	for _, i := range listIfaces() {
+		if i.Name == "lo" {
+			i := i
+			lo = &i
+		}
+	}
+	if lo == nil || lo.Type != "Loopback" || lo.MTU == 0 {
+		t.Fatalf("lo not read from host: %+v", lo)
+	}
+}

@@ -124,3 +124,16 @@ pre{border-radius:4px;border:1px solid #c4c8d2;background:#fcfcfd}
 td,th{white-space:nowrap}td.wrap,td .wrap{white-space:normal}
 .sum{display:flex;flex-wrap:wrap;gap:10px 24px}.sum>*{white-space:nowrap}
 .win main{overflow:auto}
+/* Interfaces */
+.tools{display:flex;gap:8px;align-items:center;padding:0 0 10px}.tools .find{width:200px}.tools select.find{width:120px}
+.tw{overflow:auto;border:1px solid #c4c8d2}.tw table{border:0}
+.ift td.n,.ift th.n{text-align:right;font-variant-numeric:tabular-nums}
+.ift td.fl{width:26px;font-weight:700;color:#2a35a8;text-align:center}
+.ift td.nm{font-weight:500}.ift td.sub{padding-left:26px;color:#333}
+.ift td.mac{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
+.ift tr.dis td{color:#888}
+.ifc{padding:6px 2px 0;color:#555;font-size:12px}
+.ift th,.ift td{padding-left:6px;padding-right:6px}
+.ift th{font-size:11.5px}
+.win main:has(.ift){padding:10px 12px}
+.ift td.mac{letter-spacing:0}

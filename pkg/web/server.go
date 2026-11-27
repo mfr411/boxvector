@@ -117,7 +117,7 @@ func Serve(opt Options) error {
 		"ago": func(t time.Time) string { return t.Format("02 Jan 15:04:05") },
 		"op":  func(b byte) string { return string(b) },
 	}
-	for _, p := range []string{"login", "peers", "peer_new", "config", "review", "routes", "logs", "patching"} {
+	for _, p := range []string{"login", "peers", "peer_new", "config", "review", "routes", "logs", "patching", "interfaces"} {
 		s.tpl[p] = template.Must(template.New("").Funcs(funcs).ParseFS(assets, "templates/layout.html", "templates/"+p+".html"))
 	}
 
@@ -133,6 +133,8 @@ func Serve(opt Options) error {
 	mux.HandleFunc("POST /login", s.loginPost)
 	mux.HandleFunc("POST /logout", s.authed(s.logoutPost))
 	mux.HandleFunc("GET /{$}", s.authed(s.peersPage))
+	mux.HandleFunc("GET /interfaces", s.authed(s.ifacesPage))
+	mux.HandleFunc("GET /api/ifaces", s.authed(s.ifacesAPI))
 	mux.HandleFunc("GET /peers/new", s.authed(s.peerNewPage))
 	mux.HandleFunc("POST /peers/new", s.authed(s.peerNewPost))
 	mux.HandleFunc("GET /config", s.authed(s.configPage))
@@ -165,7 +167,7 @@ func Serve(opt Options) error {
 func secure(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hd := w.Header()
-		hd.Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+		hd.Set("Content-Security-Policy", "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 		hd.Set("X-Content-Type-Options", "nosniff")
 		hd.Set("X-Frame-Options", "DENY")
 		hd.Set("Referrer-Policy", "no-referrer")
