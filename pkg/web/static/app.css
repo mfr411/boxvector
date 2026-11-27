@@ -300,3 +300,8 @@ button.pri.dng{background:#fff;border-color:#d9a3a3}
 .ift td:empty::before{content:"–";color:#b4b8c2}
 .ift tbody tr:last-child td{border-bottom:1px solid #e4e6ec;border-right:1px solid #eef0f4}
 .ift tbody tr:last-child td:last-child{border-right:0}
+
+/* title bar: boxvector logo instead of the round dot; status bar has no session label/dot */
+.ttl i{width:16px;height:16px;border-radius:0;background:url(/static/favicon.svg) center/contain no-repeat}
+.st:before{content:none;display:none}
+.st .g{margin-left:0;width:100%;justify-content:flex-start}
