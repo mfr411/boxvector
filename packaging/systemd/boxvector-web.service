@@ -10,8 +10,12 @@ User=boxvector
 Group=boxvector
 # bird group: write /etc/bird and talk to /run/bird/bird.ctl
 SupplementaryGroups=bird
+# Defaults keep existing installs unchanged; the installer writes /etc/boxvector/web.env to narrow them:
+#   WEB_LISTEN=127.0.0.1:6969   WEB_ARGS=--allow-from 192.0.2.0/24,203.0.113.5
+Environment=WEB_LISTEN=0.0.0.0:6969
+EnvironmentFile=-/etc/boxvector/web.env
 ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml \
-  --listen 0.0.0.0:6969 --state-dir /var/lib/boxvector/web \
+  --listen ${WEB_LISTEN} $WEB_ARGS --state-dir /var/lib/boxvector/web \
   --tls-cert /etc/boxvector/tls/web.crt --tls-key /etc/boxvector/tls/web.key \
   --auth-file /etc/boxvector/web.users --file-auth
 Restart=on-failure

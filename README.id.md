@@ -54,6 +54,8 @@ Pilih mode:
 | `--mode all` | core + VPP + linux-cp + web UI. Menanyakan NIC mana untuk VPP, menampilkan rencana, menunggu `y`. |
 | `--mode custom` | pilih sendiri dengan `--vpp/--no-vpp`, `--web/--no-web` |
 
+Installer menanyakan IP/CIDR mana yang boleh membuka web UI (default: IP SSH kamu; ketik `none` untuk hanya server ini). Non-interaktif: `--web-allow 192.0.2.0/24,203.0.113.5`. `--yes` tanpa opsi ini berarti hanya loopback. Menjalankan ulang installer tidak menimpa allow-list yang sudah ada.
+
 Password admin web diacak dan **hanya ditampilkan sekali** di akhir. Simpan. Atau tentukan sendiri dengan `BOXVECTOR_WEB_PASSWORD=...`.
 
 <details>
@@ -175,18 +177,15 @@ Buka `https://<host>:6969` lalu login.
 
 > Login memakai user di `/etc/boxvector/web.users` (bcrypt). Host hasil upgrade dari build lama yang belum punya user di file itu tetap memakai login akun server sampai kamu membuat user (file drop-in menjelaskan cara pindahnya).
 
-**Batasi siapa yang boleh mengakses** (wajib untuk host yang terjangkau dari internet):
+**Batasi siapa yang bisa akses** (wajib untuk host yang terjangkau dari internet). Installer menanyakan IP/CIDR yang diizinkan; kalau tidak diisi, UI hanya listen di `127.0.0.1`. Untuk mengubah nanti, edit `/etc/boxvector/web.env` lalu restart:
 
 ```sh
-sudo systemctl edit boxvector-web
+# /etc/boxvector/web.env
+WEB_LISTEN=0.0.0.0:6969
+WEB_ARGS=--allow-from 192.0.2.0/24,2001:db8::/48
 ```
-```ini
-[Service]
-ExecStart=
-ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml --listen 0.0.0.0:6969 \
-  --state-dir /var/lib/boxvector/web --tls-cert /etc/boxvector/tls/web.crt \
-  --tls-key /etc/boxvector/tls/web.key --auth-file /etc/boxvector/web.users --file-auth \
-  --allow-from 192.0.2.0/24,2001:db8::/48
+```sh
+sudo systemctl restart boxvector-web
 ```
 
 Cara akses lain: bind ke loopback dengan `--listen 127.0.0.1:8180` lalu pakai SSH tunnel, atau pasang nginx di depan ([contoh](packaging/examples/nginx-boxvector.conf), jalankan UI dengan `--trust-proxy`).

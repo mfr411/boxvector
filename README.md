@@ -56,6 +56,8 @@ Pick a mode:
 | `--mode all` | core + VPP + linux-cp + web UI. Asks which NICs go to VPP, shows a plan, waits for `y`. |
 | `--mode custom` | choose with `--vpp/--no-vpp`, `--web/--no-web` |
 
+The installer asks which IPs/CIDRs may open the web UI (default: your SSH client IP; type `none` for this server only). Non-interactive: `--web-allow 192.0.2.0/24,203.0.113.5`. `--yes` without it means loopback only. Re-running the installer keeps the allow-list you already set.
+
 The web admin password is random and **printed once** at the end. Save it. Set your own with `BOXVECTOR_WEB_PASSWORD=...`.
 
 <details>
@@ -177,18 +179,15 @@ Open `https://<host>:6969` and sign in.
 
 > Sign-in uses the users in `/etc/boxvector/web.users` (bcrypt). Hosts upgraded from an older build with no user there keep the old server-account login until you create one (a drop-in file explains how to switch).
 
-**Restrict who can reach it** (do this on any host reachable from the internet):
+**Restrict who can reach it** (do this on any host reachable from the internet). The installer asks for the allowed IPs/CIDRs; without an answer the UI listens on `127.0.0.1` only. To change it later, edit `/etc/boxvector/web.env` and restart:
 
 ```sh
-sudo systemctl edit boxvector-web
+# /etc/boxvector/web.env
+WEB_LISTEN=0.0.0.0:6969
+WEB_ARGS=--allow-from 192.0.2.0/24,2001:db8::/48
 ```
-```ini
-[Service]
-ExecStart=
-ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml --listen 0.0.0.0:6969 \
-  --state-dir /var/lib/boxvector/web --tls-cert /etc/boxvector/tls/web.crt \
-  --tls-key /etc/boxvector/tls/web.key --auth-file /etc/boxvector/web.users --file-auth \
-  --allow-from 192.0.2.0/24,2001:db8::/48
+```sh
+sudo systemctl restart boxvector-web
 ```
 
 Other access options: bind to loopback with `--listen 127.0.0.1:8180` and use an SSH tunnel, or put nginx in front ([example](packaging/examples/nginx-boxvector.conf), start the UI with `--trust-proxy`).

@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="mfr411/boxvector"
 MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; BV_VERSION="latest"
-WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0; FIB_ROUTES=""; _BIND=(); LIST_NICS=0
+WEB_USER="admin"; BIRD_GIVEN=0; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0; FIB_ROUTES=""; _BIND=(); LIST_NICS=0
 VPP_REPO_KEY=/usr/share/keyrings/fdio-release.gpg
 BIRD3_KEY=/usr/share/keyrings/cznic-labs-pkg.gpg
 
@@ -30,7 +30,7 @@ cat <<'EOF'
 boxvector installer
 
   --mode all|core|custom   all = boxvector+BIRD+VPP+web UI, core = boxvector+BIRD only
-  --bird 2|3|keep          BIRD major to install (default 2; keep = leave what is installed)
+  --bird 2|3|keep          BIRD major to install (default 2, or keep when BIRD is already installed)
   --vpp / --no-vpp         (custom) install VPP + linux-cp
   --web / --no-web         (custom) enable web UI and create the admin user
   --vpp-nic PCI[@GBPS]     add a DPDK NIC to VPP, e.g. 0000:03:00.0@25 (repeatable; must already be bound to vfio-pci/uio).
@@ -41,6 +41,8 @@ boxvector installer
   --vpp-workers N          cap the number of VPP workers (default: all remaining cores of the NIC's NUMA node)
   --no-boxvector           keep the installed boxvector package as it is
   --no-os-tune             do not touch CPU governor / systemd CPUAffinity
+  --web-allow LIST         web UI access: comma separated IPs/CIDRs (e.g. 192.0.2.0/24,203.0.113.5).
+                           Not given: asks (default = your SSH client IP); --yes without it = loopback only
   --web-user NAME          web UI admin name (default admin); password: $BOXVECTOR_WEB_PASSWORD or random
   --version X.Y.Z          release to install (default latest)
   --deb FILE|URL           install this .deb instead of downloading a release
@@ -56,7 +58,7 @@ EOF
 while [ $# -gt 0 ]; do
   case "$1" in
     --mode) MODE=${2:?}; shift 2 ;;
-    --bird) BIRD=${2:?}; shift 2 ;;
+    --bird) BIRD=${2:?}; BIRD_GIVEN=1; shift 2 ;;
     --vpp) VPP=1; shift ;;   --no-vpp) VPP=0; shift ;;
     --web) WEB=1; shift ;;   --no-web) WEB=0; shift ;;
     --vpp-nic) _v=${2:?}; VPP_NICS+=("${_v%@*}"); [[ "$_v" == *@* ]] && NIC_SPEED["${_v%@*}"]=$(( ${_v#*@} * 1000 )); shift 2 ;;
@@ -68,6 +70,7 @@ while [ $# -gt 0 ]; do
     --no-os-tune) TUNE_OS=0; shift ;;
     --no-boxvector) NO_BV=1; shift ;;
     --web-user) WEB_USER=${2:?}; shift 2 ;;
+    --web-allow) WEB_ALLOW=${2:?}; shift 2 ;;
     --version) BV_VERSION=${2:?}; shift 2 ;;
     --deb) DEB=${2:?}; shift 2 ;;
     --yes|-y) ASSUME_YES=1; shift ;;
@@ -196,9 +199,27 @@ case "$MODE" in
   *) die "--mode must be all, core or custom" ;;
 esac
 case "$BIRD" in 2|3|keep) ;; *) die "--bird must be 2, 3 or keep" ;; esac
+# never swap a running BIRD behind the user's back: without --bird, keep what is installed
+if [ "$BIRD_GIVEN" != 1 ] && command -v bird >/dev/null 2>&1; then BIRD=keep; fi
 [ ${#VPP_NICS[@]} -eq 0 ] || [ "$VPP" = 1 ] || die "--vpp-nic needs VPP (--mode all or --vpp)"
 [ "$VPP" = 1 ] && [ "$ARCH" != amd64 ] && warn "VPP packages from fd.io are published for amd64; arm64 may be unavailable"
 
+if [ "$WEB" = 1 ] && [ -z "${WEB_ALLOW:-}" ] && ! [ -s /etc/boxvector/web.env ]; then
+  if [ "$ASSUME_YES" != 1 ]; then
+    _cl=${SSH_CLIENT%% *}; [ -n "$_cl" ] && _cl="$_cl/32"
+    echo "Web UI access: comma separated IPs/CIDRs allowed to open :6969 (e.g. 192.0.2.0/24,203.0.113.5)."
+    echo "Type none = only this server (127.0.0.1, use an SSH tunnel)."
+    WEB_ALLOW=$(ask "Allow from [${_cl:-none}]:" "$_cl")
+  fi
+fi
+WEB_ALLOW=$(printf '%s' "${WEB_ALLOW:-}" | tr -d ' ')
+case "$WEB_ALLOW" in none|-|loopback) WEB_ALLOW="" ;; esac
+case "$WEB_ALLOW" in 0.0.0.0/0|::/0|*,0.0.0.0/0|*,::/0|0.0.0.0/0,*|::/0,*) warn "web UI open to the whole internet (0.0.0.0/0): make sure a firewall restricts :6969" ;; esac
+if [ -n "$WEB_ALLOW" ]; then
+  _o=$IFS; IFS=,; for _a in $WEB_ALLOW; do
+    printf '%s' "$_a" | grep -Eq '^[0-9a-fA-F:.]+(/[0-9]{1,3})?$' || die "--web-allow: '$_a' is not an IP or CIDR"
+  done; IFS=$_o
+fi
 log "plan: mode=$MODE bird=$BIRD vpp=$VPP web=$WEB os=$PRETTY_NAME arch=$ARCH"
 
 # ---------- safety: DPDK NIC ----------
@@ -282,7 +303,7 @@ show_plan() {
         done
       fi
     else echo " 3. VPP NICs   - (VPP not installed)"; fi
-    [ "$WEB" = 1 ] && echo " 4. Web UI     $WEB_USER, https :6969" || echo " 4. Web UI     not enabled"
+    [ "$WEB" = 1 ] && echo " 4. Web UI     $WEB_USER, https :6969, access: ${WEB_ALLOW:-$( [ -s /etc/boxvector/web.env ] && echo 'unchanged (web.env)' || echo 'this server only (127.0.0.1)')}" || echo " 4. Web UI     not enabled"
     echo; echo " -- Plan --------------------------------------------"
     echo " Packages   : $pk"
     if [ "$VPP" = 1 ]; then
@@ -669,6 +690,12 @@ if [ "$WEB" = 1 ]; then
       printf '%s\n%s\n' "$pw" "$pw" | runuser -u boxvector -- boxvector web passwd "$WEB_USER" --auth-file /etc/boxvector/web.users >/dev/null
       NEWPW=$pw
     fi
+    if [ -n "$WEB_ALLOW" ]; then
+      printf 'WEB_LISTEN=0.0.0.0:6969\nWEB_ARGS=--allow-from %s\n' "$WEB_ALLOW" > /etc/boxvector/web.env
+    elif ! [ -s /etc/boxvector/web.env ]; then
+      printf 'WEB_LISTEN=127.0.0.1:6969\nWEB_ARGS=\n' > /etc/boxvector/web.env
+    fi
+    chmod 644 /etc/boxvector/web.env 2>/dev/null || true
     if [ -d /run/systemd/system ]; then
       # a user now exists: sign in with web.users, not server accounts (drop the package's fallback)
       rm -f /etc/systemd/system/boxvector-web.service.d/legacy-auth.conf
@@ -694,7 +721,11 @@ command -v bird >/dev/null && echo "  bird      : $(bird --version 2>&1 | head -
 [ "$VPP" = 1 ] && echo "  vpp cpu   : $VPP_PLAN"
 [ "$REBOOT_HINT" = 1 ] && echo "  note      : reboot once so systemd CPUAffinity (OS kept on reserved cores) takes effect"
 if [ "$WEB" = 1 ]; then
-  echo "  web UI    : https://${ip4:-<server-ip>}:6969  (self-signed certificate)"
+  if [ -z "$WEB_ALLOW" ] && ! grep -q '^WEB_ARGS=--allow-from' /etc/boxvector/web.env 2>/dev/null; then
+    echo "  web UI    : https://127.0.0.1:6969 (this server only). From your PC: ssh -L 6969:127.0.0.1:6969 root@${ip4:-<server-ip>}"
+  else
+    echo "  web UI    : https://${ip4:-<server-ip>}:6969  (self-signed; allowed: $(sed -n 's/^WEB_ARGS=--allow-from //p' /etc/boxvector/web.env | head -1))"
+  fi
   [ -n "${NEWPW:-}" ] && echo "  login     : $WEB_USER / $NEWPW   <- shown once, change it after login"
 fi
 echo "  config    : /etc/boxvector.yml  (empty on purpose: every line is commented out)"
