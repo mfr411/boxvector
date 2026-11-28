@@ -27,8 +27,10 @@ async function poll(my){
   if(id===my){run=false;id=null;bc.disabled=true;bn.textContent='New session'}
 }
 async function open(){
+  var pw=document.getElementById('tpw').value,un=document.getElementById('tuser').value;
+  if(!pw){say('enter the password first');document.getElementById('tpw').focus();return}
   mk();say('connecting');
-  var r=await post('/term/new',{cols:term.cols,rows:term.rows});
+  var r=await post('/term/new',{cols:term.cols,rows:term.rows,password:pw,user:un});document.getElementById('tpw').value='';pw='';
   if(!r.ok){say((await r.text()).trim()||'failed');return}
   var j=await r.json();id=j.id;off=0;run=true;say('');bc.disabled=false;bn.textContent='Restart';poll(id);term.focus();
 }
@@ -36,5 +38,6 @@ bn.addEventListener('click',async function(){if(id){await post('/term/close',{id
 bc.addEventListener('click',async function(){if(!id)return;var o=id;run=false;id=null;await post('/term/close',{id:o});bc.disabled=true;bn.textContent='New session';say('closed')});
 addEventListener('resize',function(){if(fit)fit.fit()});
 addEventListener('pagehide',function(){if(id&&navigator.sendBeacon){var b=new URLSearchParams({id:id,csrf:csrf});navigator.sendBeacon('/term/close',b)}});
-open();
+document.getElementById('tpw').addEventListener('keydown',function(e){if(e.key==='Enter'&&!id)open()});
+say('enter the password, then press New session');
 })();

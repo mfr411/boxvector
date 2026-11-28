@@ -98,7 +98,12 @@ func (s *server) termNew(w http.ResponseWriter, r *http.Request, sess *session) 
 	if !s.termGate(w, r, sess, "") {
 		return
 	}
-	resp, err := s.termClient().PostForm("http://helper/new", url.Values{"cols": {r.PostFormValue("cols")}, "rows": {r.PostFormValue("rows")}})
+	if r.PostFormValue("password") == "" {
+		http.Error(w, "password required", http.StatusForbidden)
+		return
+	}
+	resp, err := s.termClient().PostForm("http://helper/new", url.Values{"cols": {r.PostFormValue("cols")}, "rows": {r.PostFormValue("rows")},
+		"user": {termAccount(r, sess.user)}, "password": {r.PostFormValue("password")}})
 	if err != nil {
 		http.Error(w, "terminal helper unavailable", http.StatusBadGateway)
 		return
@@ -108,7 +113,12 @@ func (s *server) termNew(w http.ResponseWriter, r *http.Request, sess *session) 
 	var m map[string]string
 	_ = json.Unmarshal(b, &m)
 	if resp.StatusCode != 200 || m["id"] == "" {
-		http.Error(w, m["error"], http.StatusServiceUnavailable)
+		code := resp.StatusCode
+		if code == 200 {
+			code = http.StatusServiceUnavailable
+		}
+		s.store.log(Event{Time: time.Now(), User: sess.user, Action: "terminal", OK: false, Summary: "terminal refused from " + s.auth.clientIP(r)})
+		http.Error(w, m["error"], code)
 		return
 	}
 	termOwner.Store(m["id"], sess.user)
@@ -159,4 +169,13 @@ func (s *server) termForward(path string, fields ...string) handler {
 		}
 		w.WriteHeader(resp.StatusCode)
 	}
+}
+
+// termAccount is the system account whose password confirms the terminal. It defaults to the
+// signed-in user; a file-auth web user can name a root/sudo account instead.
+func termAccount(r *http.Request, def string) string {
+	if u := strings.TrimSpace(r.PostFormValue("user")); u != "" && len(u) <= 32 {
+		return u
+	}
+	return def
 }

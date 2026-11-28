@@ -42,8 +42,9 @@ type termSess struct {
 }
 
 type termHelper struct {
-	mu sync.Mutex
-	m  map[string]*termSess
+	mu    sync.Mutex
+	m     map[string]*termSess
+	fails map[string][]time.Time // user -> recent bad passwords
 }
 
 func ioctl(fd uintptr, req, arg uintptr) error {
@@ -193,7 +194,7 @@ func RunTermHelper(sock string) error {
 		_ = os.Chown(sock, 0, gid)
 	}
 	_ = os.Chmod(sock, 0o660)
-	t := &termHelper{m: map[string]*termSess{}}
+	t := &termHelper{m: map[string]*termSess{}, fails: map[string][]time.Time{}}
 	go func() { // idle / finished cleanup
 		for range time.Tick(30 * time.Second) {
 			t.mu.Lock()
@@ -219,6 +220,12 @@ func RunTermHelper(sock string) error {
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 	}
 	mux.HandleFunc("POST /new", func(w http.ResponseWriter, r *http.Request) {
+		// The helper (root) checks the account itself, so a compromised web process cannot
+		// open a root shell without knowing the password of root or a sudo user.
+		if code, msg := t.authorize(r.FormValue("user"), r.FormValue("password")); code != 0 {
+			jerr(w, code, msg)
+			return
+		}
 		c, _ := strconv.Atoi(r.FormValue("cols"))
 		ro, _ := strconv.Atoi(r.FormValue("rows"))
 		s, err := t.newSess(c, ro)

@@ -3,7 +3,8 @@
 <link rel="stylesheet" href="/static/xterm.css">
 <div class="tools"><span class="mono cfile">root@{{$.Router.Hostname}}</span><span id="tstat" class="dirty" hidden></span>
 <span class="sumc"><button type="button" id="tnew">New session</button><button type="button" id="tclose" disabled>Close</button></span></div>
-<div class="tmw"><div id="term" data-csrf="{{$.CSRF}}"></div></div>
+<form id="tauth" class="tools" autocomplete="off" onsubmit="return false"><label>Account <input id="tuser" value="{{$.User}}" maxlength="32" size="12" spellcheck="false"></label> <label>Password <input id="tpw" type="password" autocomplete="current-password" size="18"></label> <span class="dirty">confirms the root terminal (root or sudo account)</span></form>
+<div class="tmw"><div id="term" data-csrf="{{$.CSRF}}" data-user="{{$.User}}"></div></div>
 <div class="ds2 cst"><span>Root shell on this server. Every open and close is written to Logs.</span><span id="tsz"></span></div>
 <script src="/static/xterm.js" defer></script><script src="/static/xterm-fit.js" defer></script><script src="/static/terminal.js" defer></script>
 {{end}}{{end}}{{end}}

@@ -132,17 +132,23 @@ func (a *auth) clientIP(r *http.Request) string {
 }
 
 // blocked reports whether ip had too many failed logins recently.
-func (a *auth) blocked(ip string) bool {
+func (a *auth) blocked(ip string) bool { return a.blockedKey(ip, maxFails) }
+
+// blockedUser stops distributed guessing against one account (many IPs, one username).
+// The threshold is higher than per-IP so a few strangers cannot easily lock the admin out.
+func (a *auth) blockedUser(user string) bool { return a.blockedKey("u:"+user, maxFails*4) }
+
+func (a *auth) blockedKey(key string, max int) bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	var keep []time.Time
-	for _, t := range a.fails[ip] {
+	for _, t := range a.fails[key] {
 		if time.Since(t) < failWindow {
 			keep = append(keep, t)
 		}
 	}
-	a.fails[ip] = keep
-	return len(keep) >= maxFails
+	a.fails[key] = keep
+	return len(keep) >= max
 }
 
 // dummyHash keeps the timing of unknown users equal to wrong passwords.
@@ -166,6 +172,9 @@ func (a *auth) login(ip, user, password string) (*session, string, bool) {
 	if !ok {
 		a.mu.Lock()
 		a.fails[ip] = append(a.fails[ip], time.Now())
+		if len(user) <= 64 {
+			a.fails["u:"+user] = append(a.fails["u:"+user], time.Now())
+		}
 		a.mu.Unlock()
 		return nil, "", false
 	}
@@ -174,6 +183,7 @@ func (a *auth) login(ip, user, password string) (*session, string, bool) {
 	a.mu.Lock()
 	a.sessions[tokKey(tok)] = s
 	delete(a.fails, ip)
+	delete(a.fails, "u:"+user)
 	a.saveLocked()
 	a.mu.Unlock()
 	return s, tok, true

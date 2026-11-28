@@ -25,6 +25,7 @@ var (
 	webTermSock   string
 	webNetSock    string
 	webTermInsec  bool
+	webAllowFrom  []string
 )
 
 func init() {
@@ -35,6 +36,7 @@ func init() {
 	webCmd.Flags().BoolVar(&webTrustProxy, "trust-proxy", false, "trust X-Forwarded-For/Proto from a reverse proxy")
 	webCmd.Flags().BoolVar(&webFileAuth, "file-auth", false, "sign in with --auth-file users (bcrypt) instead of the server accounts")
 	webCmd.Flags().BoolVar(&webAllowAny, "allow-public", true, "allow listening on a non-loopback address without TLS")
+	webCmd.Flags().StringSliceVar(&webAllowFrom, "allow-from", nil, "only these client IPs/CIDRs may reach the UI (comma separated; default: everyone)")
 	webCmd.Flags().StringVar(&webNetSock, "net-socket", "/run/boxvector-net.sock", "root network helper socket")
 	webCmd.Flags().StringVar(&webTermSock, "terminal-socket", "/run/boxvector-term.sock", "root terminal helper socket")
 	webCmd.Flags().BoolVar(&webTermInsec, "terminal-insecure", false, "allow the root terminal over plain HTTP (default: HTTPS or localhost only)")
@@ -61,11 +63,14 @@ var webCmd = &cobra.Command{
 		if (webTLSCert == "") != (webTLSKey == "") {
 			log.Fatal("--tls-cert and --tls-key must be used together")
 		}
+		if !webFileAuth && len(webAllowFrom) == 0 && !strings.HasPrefix(webListen, "127.") && !strings.HasPrefix(webListen, "[::1]") {
+			log.Warnf("web UI listens on %s with server-account (shadow) login and no --allow-from: restrict it with --allow-from <cidr> or use --file-auth", webListen)
+		}
 		log.Infof("boxvector web UI on %s (config %s)", webListen, configFile)
 		err = web.Serve(web.Options{
 			Listen: webListen, ConfigFile: configFile, AuthFile: webAuthFile, StateDir: webStateDir,
 			TLSCert: webTLSCert, TLSKey: webTLSKey, TrustProxy: webTrustProxy, SystemAuth: !webFileAuth,
-			TermSocket: webTermSock, NetSocket: webNetSock, TermInsecure: webTermInsec,
+			TermSocket: webTermSock, NetSocket: webNetSock, TermInsecure: webTermInsec, AllowFrom: webAllowFrom,
 		})
 		if err != nil {
 			log.Fatal(err)

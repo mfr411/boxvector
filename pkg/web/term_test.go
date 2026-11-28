@@ -3,6 +3,7 @@ package web
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
@@ -32,5 +33,23 @@ func TestSetPeerKey(t *testing.T) {
 	}
 	if _, err := setPeerKey(doc, "nope", "disabled", off); err == nil {
 		t.Fatal("unknown peer must fail")
+	}
+}
+
+func TestTermAuthorize(t *testing.T) {
+	h := &termHelper{m: map[string]*termSess{}, fails: map[string][]time.Time{}}
+	if c, _ := h.authorize("root", ""); c != 403 {
+		t.Fatalf("empty password must be refused, got %d", c)
+	}
+	if c, _ := h.authorize("", "x"); c != 403 {
+		t.Fatalf("empty user must be refused, got %d", c)
+	}
+	for i := 0; i < termFailMax; i++ {
+		if c, _ := h.authorize("definitely-not-a-user-xyz", "wrong"); c != 403 {
+			t.Fatalf("try %d: want 403, got %d", i, c)
+		}
+	}
+	if c, _ := h.authorize("definitely-not-a-user-xyz", "wrong"); c != 429 {
+		t.Fatalf("must lock after %d failures, got %d", termFailMax, c)
 	}
 }

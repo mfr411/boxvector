@@ -34,10 +34,11 @@ type Options struct {
 	TLSKey       string
 	TrustProxy   bool
 	Version      string
-	TermSocket   string // root terminal helper socket
-	NetSocket    string // root network helper socket
-	TermInsecure bool   // allow the terminal over plain HTTP
-	SystemAuth   bool   // sign in with the server's own accounts (root / sudo group)
+	TermSocket   string   // root terminal helper socket
+	NetSocket    string   // root network helper socket
+	TermInsecure bool     // allow the terminal over plain HTTP
+	AllowFrom    []string // CIDRs allowed to reach the UI (empty = everyone)
+	SystemAuth   bool     // sign in with the server's own accounts (root / sudo group)
 }
 
 type server struct {
@@ -45,6 +46,7 @@ type server struct {
 	auth  *auth
 	store *store
 	tpl   map[string]*template.Template
+	allow []netip.Prefix
 }
 
 // routerInfo is the subset of the boxvector config the UI needs; parsed
@@ -97,7 +99,12 @@ func Serve(opt Options) error {
 	if err != nil {
 		return err
 	}
+	allow, err := ParseAllow(opt.AllowFrom)
+	if err != nil {
+		return fmt.Errorf("--allow-from: %w", err)
+	}
 	s := &server{
+		allow: allow,
 		opt:   opt,
 		auth:  newAuthOpt(opt),
 		store: &store{configFile: opt.ConfigFile, stateDir: opt.StateDir, binary: exe},
@@ -193,7 +200,7 @@ func Serve(opt Options) error {
 
 	srv := &http.Server{
 		Addr:              opt.Listen,
-		Handler:           secure(mux),
+		Handler:           secure(s.gate(mux)),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      6 * time.Minute, // apply may run bgpq4/PeeringDB
@@ -215,6 +222,9 @@ func secure(h http.Handler) http.Handler {
 			sty = "'self' 'unsafe-inline'" // xterm.js injects its renderer styles
 		}
 		hd.Set("Content-Security-Policy", "default-src 'none'; style-src "+sty+"; script-src 'self'; connect-src 'self'; img-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
+		if r.TLS != nil {
+			hd.Set("Strict-Transport-Security", "max-age=31536000")
+		}
 		hd.Set("X-Content-Type-Options", "nosniff")
 		hd.Set("X-Frame-Options", "DENY")
 		hd.Set("Referrer-Policy", "no-referrer")
@@ -283,7 +293,7 @@ func (s *server) loginPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) loginPost(w http.ResponseWriter, r *http.Request) {
 	ip := s.auth.clientIP(r)
-	if s.auth.blocked(ip) {
+	if s.auth.blocked(ip) || s.auth.blockedUser(r.PostFormValue("user")) {
 		w.WriteHeader(http.StatusTooManyRequests)
 		s.render(w, "login", ctxPage{Title: "Sign in", Version: "-", Data: "Too many attempts. Try again in 10 minutes."})
 		return
