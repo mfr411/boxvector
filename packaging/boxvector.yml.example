@@ -1,32 +1,35 @@
-# boxvector example configuration. Full reference: docs/ in the repository.
-asn: 65530                       # your ASN
-router-id: 192.0.2.1
-source4: 192.0.2.1
-source6: 2001:db8::1
-prefixes:                        # prefixes you originate
-  - 192.0.2.0/24
-  - 2001:db8::/48
-hostname: rs1
-
-bird-directory: /etc/bird/
-bird-socket: /run/bird/bird.ctl
-cache-directory: /var/lib/boxvector/cache
-web-ui-file: /var/lib/boxvector/status.html
+# boxvector configuration. Nothing here is active yet: uncomment and edit the lines you need.
+# Full option list: https://github.com/mfr411/boxvector/blob/main/docs/configuration.md
+# After editing:  sudo -u boxvector boxvector generate -c /etc/boxvector.yml --dry-run
+#
+# asn: 65530                       # your ASN
+# router-id: 192.0.2.1
+# source4: 192.0.2.1
+# source6: 2001:db8::1
+# prefixes:                        # prefixes you originate
+#   - 192.0.2.0/24
+#   - 2001:db8::/48
+# hostname: rs1
+#
+# bird-directory: /etc/bird/
+# bird-socket: /run/bird/bird.ctl
+# cache-directory: /var/lib/boxvector/cache
+# web-ui-file: /var/lib/boxvector/status.html
 # bird-threads: 4               # BIRD 3 only
-
-templates:
-  upstream:
-    local-pref: 100
-    filter-irr: false      # needs bgpq4 + a valid as-set per peer; enable once the peer has one
-    filter-rpki: true
-    auto-import-limits: false
-    auto-as-set: false
-    add-on-import: ["65530:100"]
-
-peers:
-  Example Upstream:
-    template: upstream
-    asn: 65510
-    neighbors:
-      - 203.0.113.1
-      - 2001:db8:ffff::1
+#
+# templates:
+#   upstream:
+#     local-pref: 100
+#     filter-irr: false      # needs bgpq4 + a valid as-set per peer; enable once the peer has one
+#     filter-rpki: true
+#     auto-import-limits: false
+#     auto-as-set: false
+#     add-on-import: ["65530:100"]
+#
+# peers:
+#   Example Upstream:
+#     template: upstream
+#     asn: 65510
+#     neighbors:
+#       - 203.0.113.1
+#       - 2001:db8:ffff::1

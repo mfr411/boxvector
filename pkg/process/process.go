@@ -141,6 +141,9 @@ func Load(configBlob []byte) (*config.Config, error) {
 	c.Init()
 	defaults.MustSet(&c)
 
+	if len(bytes.TrimSpace(stripYAMLComments(configBlob))) == 0 {
+		return nil, fmt.Errorf("config is empty: every line is commented out. Uncomment and edit asn, router-id, source4/source6 and prefixes first")
+	}
 	if err := util.YAMLUnmarshalStrict(configBlob, &c); err != nil {
 		return nil, fmt.Errorf("YAML unmarshal: %s", err)
 	}
@@ -834,4 +837,16 @@ func parseStaticRoutes(c *config.Config) error {
 		}
 	}
 	return nil
+}
+
+// stripYAMLComments drops whole-line comments so a file that only holds the commented example
+// is reported as empty instead of a cryptic YAML error.
+func stripYAMLComments(b []byte) []byte {
+	var out [][]byte
+	for _, l := range bytes.Split(b, []byte("\n")) {
+		if t := bytes.TrimSpace(l); len(t) > 0 && t[0] != '#' {
+			out = append(out, l)
+		}
+	}
+	return bytes.Join(out, []byte("\n"))
 }

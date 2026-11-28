@@ -697,7 +697,10 @@ if [ "$WEB" = 1 ]; then
   echo "  web UI    : https://${ip4:-<server-ip>}:6969  (self-signed certificate)"
   [ -n "${NEWPW:-}" ] && echo "  login     : $WEB_USER / $NEWPW   <- shown once, change it after login"
 fi
-echo "  config    : /etc/boxvector.yml"
+echo "  config    : /etc/boxvector.yml  (empty on purpose: every line is commented out)"
+echo "  next      : 1) edit /etc/boxvector.yml (asn, router-id, prefixes, peers)"
+echo "              2) sudo -u boxvector boxvector generate -c /etc/boxvector.yml --dry-run"
+echo "              3) sudo -u boxvector boxvector generate -c /etc/boxvector.yml   (nothing was generated or applied to BIRD yet)"
 [ "$WEB" = 1 ] || echo "  web UI    : not enabled. Enable later: sudo -u boxvector boxvector web passwd admin --auth-file /etc/boxvector/web.users && sudo systemctl enable --now boxvector-web"
 [ "$VPP" = 1 ] && echo "  vpp       : vppctl show interface | vppctl show lcp   (bind NICs: see README, VPP)"
 exit 0

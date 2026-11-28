@@ -78,8 +78,9 @@ Detail VPP, syarat (IOMMU, RAM), dan cara membatalkan: [docs/vpp.md](docs/vpp.md
 
 ```sh
 boxvector version
-sudo birdc show protocols
 ```
+
+Installer **tidak** menjalankan `generate` dan tidak menyentuh BIRD. `/etc/boxvector.yml` dipasang dengan semua baris di-comment: isi dulu (bagian berikutnya), baru generate.
 
 ---
 
@@ -112,7 +113,7 @@ Paket membuat user `boxvector` (grup `bird`), `/etc/boxvector.yml` (dari contoh,
 
 ## 3. Konfigurasi
 
-Edit `/etc/boxvector.yml`:
+Edit `/etc/boxvector.yml` (dipasang dengan semua baris di-comment; buka comment dan sesuaikan):
 
 ```yaml
 asn: 65530

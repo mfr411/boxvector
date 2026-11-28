@@ -62,7 +62,9 @@ EOF
     systemctl try-restart boxvector-net.service boxvector-term.service boxvector-web.service boxvector-agent.service >/dev/null 2>&1 || true
   fi
   if [ ! -s /etc/boxvector/web.users ]; then
-    echo "boxvector: edit /etc/boxvector.yml, then create a web user:"
+    echo "boxvector: /etc/boxvector.yml is a commented template. BIRD is not touched until you edit it and run:"
+    echo "  sudo -u boxvector boxvector generate -c /etc/boxvector.yml --dry-run"
+    echo "then create a web user:"
     echo "  sudo -u boxvector boxvector web passwd admin --auth-file /etc/boxvector/web.users"
     echo "  sudo systemctl enable --now boxvector-web"
   fi

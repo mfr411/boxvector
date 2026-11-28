@@ -290,3 +290,10 @@ peers:
 		}
 	}
 }
+
+func TestLoadCommentedOnlyConfig(t *testing.T) {
+	_, err := Load([]byte("# asn: 65530\n#\n# prefixes:\n#   - 192.0.2.0/24\n"))
+	if err == nil || !strings.Contains(err.Error(), "commented out") {
+		t.Fatalf("want a clear empty-config error, got %v", err)
+	}
+}

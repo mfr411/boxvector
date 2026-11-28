@@ -78,8 +78,9 @@ VPP details, requirements (IOMMU, RAM) and undo steps: [docs/vpp.md](docs/vpp.md
 
 ```sh
 boxvector version
-sudo birdc show protocols
 ```
+
+The installer does **not** run `generate` and does not touch BIRD. `/etc/boxvector.yml` ships fully commented out: edit it first (next section), then generate.
 
 ---
 
@@ -112,7 +113,7 @@ The package creates the `boxvector` user (in group `bird`), `/etc/boxvector.yml`
 
 ## 3. Configure
 
-Edit `/etc/boxvector.yml`:
+Edit `/etc/boxvector.yml` (shipped fully commented out; uncomment and adapt this):
 
 ```yaml
 asn: 65530
