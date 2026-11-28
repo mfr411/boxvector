@@ -209,7 +209,12 @@ func report(c AgentConf, ver, status, msg string) {
 	}
 }
 
-func download(c AgentConf, o Order, dst string) error {
+func download(c AgentConf, o Order, dst string) (err error) {
+	defer func() {
+		if err != nil {
+			_ = os.Remove(dst) // never leave an unverified package on disk
+		}
+	}()
 	if strings.ContainsAny(o.File, "/\\") {
 		return errors.New("bad file name")
 	}
@@ -234,8 +239,14 @@ func download(c AgentConf, o Order, dst string) error {
 	if err != nil {
 		return err
 	}
-	if n != o.Size || hex.EncodeToString(h.Sum(nil)) != o.SHA256 {
+	sum := hex.EncodeToString(h.Sum(nil))
+	if n != o.Size || sum != o.SHA256 {
 		return errors.New("checksum mismatch, package discarded")
+	}
+	// The monitor only supplies the file and its hash; the signature is checked against keys the
+	// agent already trusts, so a compromised monitor cannot get its own package installed.
+	if err := VerifyRelease(o.File, sum, o.Sig); err != nil {
+		return errors.New("package not signed by a trusted release key: " + err.Error())
 	}
 	return nil
 }

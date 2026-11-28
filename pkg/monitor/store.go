@@ -64,6 +64,7 @@ type Release struct {
 	File     string    `json:"file"`
 	SHA256   string    `json:"sha256"`
 	Size     int64     `json:"size"`
+	Sig      string    `json:"sig,omitempty"`
 	Uploaded time.Time `json:"uploaded"`
 }
 
@@ -224,6 +225,7 @@ type Order struct {
 	File    string `json:"file"`
 	SHA256  string `json:"sha256"`
 	Size    int64  `json:"size"`
+	Sig     string `json:"sig"`
 }
 
 func (st *Store) release(ver, arch string) *Release {
@@ -268,7 +270,7 @@ func (st *Store) Heartbeat(secret, ip string, in Info) (*Order, error) {
 			}
 		}
 		if r := st.release(d.Target, in.Arch); r != nil && !busy {
-			order = &Order{Version: r.Version, File: r.File, SHA256: r.SHA256, Size: r.Size}
+			order = &Order{Version: r.Version, File: r.File, SHA256: r.SHA256, Size: r.Size, Sig: r.Sig}
 			d.Patch.Status, d.Patch.At, d.Patch.Msg = "running", now, "handed out"
 			st.event(d.ID, d.Name+": patch to "+r.Version+" started")
 		}

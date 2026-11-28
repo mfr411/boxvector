@@ -505,7 +505,19 @@ func (s *Server) upload(r *http.Request) string {
 	if string(head) != "!<arch>\n" {
 		return "Not a valid .deb file"
 	}
-	rel := Release{Version: mm[1], Arch: mm[2], File: name, SHA256: hex.EncodeToString(h.Sum(nil)), Size: n}
+	sha := hex.EncodeToString(h.Sum(nil))
+	sig := strings.TrimSpace(r.FormValue("sig"))
+	if sf, _, e := r.FormFile("sigfile"); e == nil {
+		b, _ := io.ReadAll(io.LimitReader(sf, 1024))
+		sf.Close()
+		sig = strings.TrimSpace(string(b))
+	}
+	if sig != "" {
+		if e := VerifyRelease(name, sha, sig); e != nil {
+			return "Signature rejected: " + e.Error()
+		}
+	}
+	rel := Release{Version: mm[1], Arch: mm[2], File: name, SHA256: sha, Size: n, Sig: sig}
 	if err := s.st.AddRelease(rel); err != nil {
 		return err.Error()
 	}
