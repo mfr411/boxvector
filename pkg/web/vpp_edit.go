@@ -85,7 +85,7 @@ func (s *server) vppPost(w http.ResponseWriter, r *http.Request, sess *session) 
 }
 
 func (s *server) vppConfirm(w http.ResponseWriter, r *http.Request, sess *session) {
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -110,6 +110,6 @@ func (s *server) vppStatus(w http.ResponseWriter, r *http.Request, sess *session
 		_ = json.Unmarshal(b, &m)
 		m["helper"] = true
 	}
-	m["can"] = canTerminal(sess.user)
+	m["can"] = s.isAdmin(sess)
 	_ = json.NewEncoder(w).Encode(m)
 }

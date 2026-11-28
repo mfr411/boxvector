@@ -94,7 +94,7 @@ func (s *server) kroutePage(w http.ResponseWriter, sess *session, f map[string]s
 }
 
 func (s *server) kGate(w http.ResponseWriter, sess *session) bool {
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		http.Error(w, "editing kernel routes is limited to root and members of the sudo group", http.StatusForbidden)
 		return false
 	}

@@ -42,3 +42,21 @@ func (t *termHelper) authorize(user, password string) (int, string) {
 	t.mu.Unlock()
 	return 0, ""
 }
+
+// isAdmin says whether a signed-in web user may use the root-level pages (interfaces, routes,
+// traffic, VPP, terminal). With server-account login it needs root/sudo. With --file-auth every
+// listed user is an administrator: they can already rewrite the BGP config. The terminal still
+// asks the root helper to verify a root/sudo account password.
+func (s *server) isAdmin(sess *session) bool {
+	if s.auth.system {
+		return canTerminal(sess.user)
+	}
+	return true
+}
+
+func (s *server) termDefaultAccount(sess *session) string {
+	if s.auth.system {
+		return sess.user
+	}
+	return "root"
+}

@@ -36,6 +36,23 @@ if [ "$1" = configure ]; then
   if [ -d /etc/bird ]; then
     chgrp -R bird /etc/bird && chmod -R g+rwX /etc/bird && chmod 2775 /etc/bird || true
   fi
+  # Web login: users in /etc/boxvector/web.users (bcrypt). Hosts that never created one keep the
+  # old server-account login through a drop-in, so an upgrade cannot lock anyone out.
+  D=/etc/systemd/system/boxvector-web.service.d
+  if [ ! -s /etc/boxvector/web.users ] && [ -d /run/systemd/system ]; then
+    mkdir -p "$D"
+    cat > "$D/legacy-auth.conf" <<'EOF'
+# Written by the boxvector package because /etc/boxvector/web.users has no user yet: the web UI
+# keeps signing in with server accounts (/etc/shadow). Create a user with
+#   sudo -u boxvector boxvector web passwd admin --auth-file /etc/boxvector/web.users
+# then delete this file and run: systemctl daemon-reload && systemctl restart boxvector-web
+[Service]
+SupplementaryGroups=bird shadow
+ExecStart=
+ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml --listen 0.0.0.0:6969 --state-dir /var/lib/boxvector/web --tls-cert /etc/boxvector/tls/web.crt --tls-key /etc/boxvector/tls/web.key --auth-file /etc/boxvector/web.users
+EOF
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
   if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null || true
     systemctl enable --now boxvector-net.service >/dev/null 2>&1 || true

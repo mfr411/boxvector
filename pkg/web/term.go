@@ -64,7 +64,7 @@ func (s *server) termGate(w http.ResponseWriter, r *http.Request, sess *session,
 		http.Error(w, "terminal needs HTTPS (or localhost)", http.StatusForbidden)
 		return false
 	}
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		http.Error(w, "terminal is limited to root and sudo users", http.StatusForbidden)
 		return false
 	}
@@ -82,7 +82,7 @@ func (s *server) termPage(w http.ResponseWriter, r *http.Request, sess *session)
 	switch {
 	case !s.secureTransport(r):
 		msg = "The terminal is disabled over plain HTTP. Use HTTPS (--tls-cert/--tls-key or a reverse proxy with --trust-proxy), or start the web service with --terminal-insecure."
-	case !canTerminal(sess.user):
+	case !s.isAdmin(sess):
 		msg = "The terminal is limited to root and members of the sudo group."
 	default:
 		if c, err := net.DialTimeout("unix", s.opt.TermSocket, 2*time.Second); err != nil {
@@ -91,7 +91,7 @@ func (s *server) termPage(w http.ResponseWriter, r *http.Request, sess *session)
 			c.Close()
 		}
 	}
-	s.render(w, "terminal", ctxPage{Title: "Terminal", Nav: "terminal", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"Msg": msg}})
+	s.render(w, "terminal", ctxPage{Title: "Terminal", Nav: "terminal", User: sess.user, CSRF: sess.csrf, Data: map[string]any{"Msg": msg, "Account": s.termDefaultAccount(sess)}})
 }
 
 func (s *server) termNew(w http.ResponseWriter, r *http.Request, sess *session) {

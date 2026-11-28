@@ -53,7 +53,7 @@ var ifActs = map[string][2]string{ // op -> title, help
 }
 
 func (s *server) ifGate(w http.ResponseWriter, sess *session) bool {
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		http.Error(w, "editing interfaces is limited to root and members of the sudo group", http.StatusForbidden)
 		return false
 	}
@@ -112,7 +112,7 @@ func (s *server) ifPost(w http.ResponseWriter, r *http.Request, sess *session) {
 
 // ifConfirm handles the banner buttons (confirm / revert) as JSON.
 func (s *server) ifConfirm(w http.ResponseWriter, r *http.Request, sess *session) {
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -143,7 +143,7 @@ func (s *server) ifStatus(w http.ResponseWriter, r *http.Request, sess *session)
 		m = map[string]any{}
 	}
 	m["helper"] = true
-	m["can"] = canTerminal(sess.user)
+	m["can"] = s.isAdmin(sess)
 	delete(m, "managed")
 	_ = json.NewEncoder(w).Encode(m)
 }

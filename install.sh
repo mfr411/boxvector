@@ -670,7 +670,12 @@ if [ "$WEB" = 1 ]; then
       NEWPW=$pw
     fi
     if [ -d /run/systemd/system ]; then
-      systemctl enable --now boxvector-web
+      # a user now exists: sign in with web.users, not server accounts (drop the package's fallback)
+      rm -f /etc/systemd/system/boxvector-web.service.d/legacy-auth.conf
+      rmdir /etc/systemd/system/boxvector-web.service.d 2>/dev/null || true
+      systemctl daemon-reload >/dev/null 2>&1 || true
+      systemctl enable boxvector-web
+      systemctl restart boxvector-web
       sleep 1
       systemctl is-active --quiet boxvector-web || die "boxvector-web is not running: journalctl -u boxvector-web"
     else

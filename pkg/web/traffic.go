@@ -11,7 +11,7 @@ import (
 // service only checks the session (root/sudo) and relays.
 
 func (s *server) trafficPage(w http.ResponseWriter, r *http.Request, sess *session) {
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -21,7 +21,7 @@ func (s *server) trafficPage(w http.ResponseWriter, r *http.Request, sess *sessi
 func (s *server) trafficAPI(w http.ResponseWriter, r *http.Request, sess *session) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
-	if !canTerminal(sess.user) {
+	if !s.isAdmin(sess) {
 		w.WriteHeader(http.StatusForbidden)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "forbidden"})
 		return
