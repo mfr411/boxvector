@@ -17,8 +17,8 @@ web-ui-file: /var/lib/boxvector/status.html
 templates:
   upstream:
     local-pref: 100
-    filter-irr: false
-    filter-rpki: false
+    filter-irr: false      # needs bgpq4 + a valid as-set per peer; enable once the peer has one
+    filter-rpki: true
     auto-import-limits: false
     auto-as-set: false
     add-on-import: ["65530:100"]
