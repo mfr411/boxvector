@@ -189,7 +189,7 @@ ExecStart=/usr/bin/boxvector web -c /etc/boxvector.yml --listen 0.0.0.0:6969 \
   --allow-from 192.0.2.0/24,2001:db8::/48
 ```
 
-Other access options: bind to loopback with `--listen 127.0.0.1:8180` and use an SSH tunnel, or put nginx in front ([example](packaging/nginx-boxvector.conf), start the UI with `--trust-proxy`).
+Other access options: bind to loopback with `--listen 127.0.0.1:8180` and use an SSH tunnel, or put nginx in front ([example](packaging/examples/nginx-boxvector.conf), start the UI with `--trust-proxy`).
 
 | Page | What it does |
 |---|---|

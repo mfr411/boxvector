@@ -1,23 +1,15 @@
-# Binary
-pathvector
-
-# Output files
-output/*
-
-# JetBrains configs
-.idea/
-
-# Release
+# Build output
+/boxvector
 dist/
 build/
-pathvector-*-release.pdf
 
-# Coverage
+# Test artifacts
+coverage.txt
 cover.*
-
-# Testing
+nohup.out
 test-cache/
 test-conf.yml
-nohup.out
-coverage.txt
 tests/bird-matrix/v*
+
+# Editors
+.idea/

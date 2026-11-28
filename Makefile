@@ -27,4 +27,4 @@ test-sequence: test-setup test test-teardown
 docs:
 	docs/generate.sh
 
-.PHONY: docs
+.PHONY: dep docs test test-setup test-teardown test-sequence dummy-iface peeringdb-test-harness
