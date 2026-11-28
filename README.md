@@ -5,9 +5,11 @@
   </picture>
 </p>
 
-<p align="center"><b>English</b> · <a href="README.id.md">Bahasa Indonesia</a></p>
+<p align="center"><b>English</b> · <a href="README.id.md">Bahasa Indonesia</a> · <a href="https://boxvector.co/">Website &amp; docs</a></p>
 
 # boxvector
+
+Official site and docs: **[boxvector.co](https://boxvector.co)**.
 
 BGP configuration for [BIRD](https://bird.nic.cz) 2 and 3, from one YAML file, with a web UI.
 A fork of [Pathvector](https://github.com/natesales/pathvector) focused on BIRD 3, security and day-to-day operations.
