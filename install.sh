@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="mfr411/boxvector"
 MODE=""; BIRD="2"; VPP=""; WEB=""; DEB=""; BV_VERSION="latest"
-WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0; FIB_ROUTES=""
+WEB_USER="admin"; NO_BV=0; declare -A NIC_SPEED=(); ESTIMATE=0; VPP_NICS=(); VPP_RESERVE=1; VPP_SMT=0; VPP_WORKERS=""; TUNE_OS=1; ASSUME_YES=0; DRY=0; FORCE=0; FIB_ROUTES=""; _BIND=(); LIST_NICS=0
 VPP_REPO_KEY=/usr/share/keyrings/fdio-release.gpg
 BIRD3_KEY=/usr/share/keyrings/cznic-labs-pkg.gpg
 
@@ -44,6 +44,7 @@ boxvector installer
   --web-user NAME          web UI admin name (default admin); password: $BOXVECTOR_WEB_PASSWORD or random
   --version X.Y.Z          release to install (default latest)
   --deb FILE|URL           install this .deb instead of downloading a release
+  --list-nics              list PCI Ethernet cards (driver, speed, NUMA, state) and exit
   --yes                    no questions (needs --mode)
   --dry-run                show what would be done
   --fib-routes N           routes VPP must hold (sizes the heap; default: read from BIRD, else by RAM)
@@ -60,6 +61,7 @@ while [ $# -gt 0 ]; do
     --web) WEB=1; shift ;;   --no-web) WEB=0; shift ;;
     --vpp-nic) _v=${2:?}; VPP_NICS+=("${_v%@*}"); [[ "$_v" == *@* ]] && NIC_SPEED["${_v%@*}"]=$(( ${_v#*@} * 1000 )); shift 2 ;;
     --estimate) ESTIMATE=1; shift ;;
+    --list-nics) LIST_NICS=1; shift ;;
     --vpp-reserve) VPP_RESERVE=${2:?}; shift 2 ;;
     --vpp-smt) VPP_SMT=1; shift ;;
     --vpp-workers) VPP_WORKERS=${2:?}; shift 2 ;;
@@ -96,6 +98,76 @@ case "$(dpkg --print-architecture)" in
 esac
 
 [ "$ESTIMATE" = 1 ] && { MODE=${MODE:-all}; VPP=1; }
+# Split the CPUs for VPP. Reads lscpu topology; nothing is hardcoded.
+#   reserved : first VPP_RESERVE physical cores (all their threads) -> OS, BIRD, boxvector, VPP main thread
+#   workers  : every other physical core on the NUMA node of the NIC (+ SMT siblings with --vpp-smt)
+# Workers on a NUMA node different from the NIC would cross the interconnect for every packet, so they are not used.
+vpp_cpu_plan() {
+  local node=0 pci topo
+  if [ ${#VPP_NICS[@]} -gt 0 ]; then
+    pci=${VPP_NICS[0]}
+    node=$(cat "/sys/bus/pci/devices/$pci/numa_node" 2>/dev/null || echo 0); [ "$node" -ge 0 ] 2>/dev/null || node=0
+  fi
+  topo=$(lscpu -p=CPU,CORE,SOCKET,NODE 2>/dev/null | grep -v '^#' || true)
+  [ -n "$topo" ] || topo=$(seq 0 $(( $(nproc) - 1 )) | awk '{print $1","$1",0,0"}')
+  # NODE column is empty on some VMs: treat as node 0
+  topo=$(echo "$topo" | awk -F, '{n=($4==""?0:$4); print $1","$2","$3","n}')
+  awk -F, -v node="$node" -v reserve="$VPP_RESERVE" -v smt="$VPP_SMT" -v maxw="${VPP_WORKERS:-0}" '
+    function ranges(a, n,   i, out, st, pv) {
+      out=""; st=a[1]; pv=a[1]
+      for (i=2;i<=n+1;i++) {
+        if (i<=n && a[i]==pv+1) { pv=a[i]; continue }
+        out = out (out==""?"":",") (st==pv ? st : st "-" pv)
+        st=a[i]; pv=a[i]
+      }
+      return out
+    }
+    { cpu=$1; key=$3"/"$2; if (!(key in first)) { first[key]=cpu; order[++nk]=key; cnode[key]=$4 }
+      if (cpu<first[key]) first[key]=cpu
+      thr[key]=thr[key] " " cpu; nodeof[cpu]=$4 }
+    END {
+      # sort physical cores by their first cpu id
+      for (i=1;i<=nk;i++) for (j=i+1;j<=nk;j++) if (first[order[j]]+0 < first[order[i]]+0) { tmp=order[i]; order[i]=order[j]; order[j]=tmp }
+      nres=0; nw=0; ncpu=0
+      for (i=1;i<=nk;i++) { k=order[i]; split(thr[k], t, " ")
+        if (nres < reserve) { nres++; for (x in t) res[++nr]=t[x]; continue }
+        if (cnode[k] != node) continue
+        # t[] order is not guaranteed; pick lowest as the physical thread, the rest are SMT siblings
+        n=0; for (x in t) arr[++n]=t[x]+0
+        for (a=1;a<=n;a++) for (b=a+1;b<=n;b++) if (arr[b]<arr[a]) { v=arr[a]; arr[a]=arr[b]; arr[b]=v }
+        w[++nw]=arr[1]; if (smt==1) for (a=2;a<=n;a++) sib[++ns]=arr[a]
+        delete arr
+      }
+      np=nw; for (a=1;a<=ns;a++) w[++nw]=sib[a]
+      for (a=1;a<=nw;a++) for (b=a+1;b<=nw;b++) if (w[b]<w[a]) { v=w[a]; w[a]=w[b]; w[b]=v }
+      if (maxw>0 && nw>maxw) nw=maxw
+      for (a=1;a<=nr;a++) for (b=a+1;b<=nr;b++) if (res[b]+0<res[a]+0) { v=res[a]; res[a]=res[b]; res[b]=v }
+      printf "MAIN=%s\nWORKERS=%s\nNW=%d\nRESERVED=%s\nNPHYS=%d\nNSMT=%d\n", res[1]+0, (nw>0?ranges(w,nw):""), nw, ranges(res,nr), (np<nw?np:nw), nw-(np<nw?np:nw)
+    }' <<<"$topo"
+}
+
+nic_list() { # prints: pci|iface|driver|speed|numa|state|description
+  local d pci cls net drv spd numa st desc ad
+  for d in /sys/bus/pci/devices/*; do
+    pci=${d##*/}; cls=$(cat "$d/class" 2>/dev/null || echo 0)
+    [[ "$cls" == 0x02* ]] || continue
+    net=$(ls "$d/net" 2>/dev/null | head -1 || true)
+    drv=$(basename "$(readlink -f "$d/driver" 2>/dev/null || echo none)")
+    spd=""; [ -n "$net" ] && spd=$(cat "/sys/class/net/$net/speed" 2>/dev/null || true)
+    [[ "$spd" =~ ^[0-9]+$ ]] && [ "$spd" -gt 0 ] && spd="$((spd/1000))G" || spd="-"
+    numa=$(cat "$d/numa_node" 2>/dev/null || echo -1)
+    st=free
+    if [ -n "$net" ]; then
+      ip route show default 2>/dev/null | grep -qE " dev $net( |\$)" && st=mgmt
+      if [ "$st" = free ]; then ad=$(ip -o addr show dev "$net" scope global 2>/dev/null || true); [ -z "$ad" ] || st=has-ip; fi
+    fi
+    case "$drv" in vfio-pci|uio_pci_generic|igb_uio) st=dpdk-ready ;; esac
+    desc=$(lspci -s "$pci" 2>/dev/null | cut -d: -f3- | sed 's/^ *//' | cut -c1-48 || true)
+    echo "$pci|${net:--}|$drv|$spd|$numa|$st|$desc"
+  done
+}
+[ "${LIST_NICS:-0}" = 1 ] && { printf '%-13s %-9s %-12s %-6s %-5s %-10s %s\n' PCI IFACE DRIVER SPEED NUMA STATE DEVICE; nic_list | awk -F'|' '{printf "%-13s %-9s %-12s %-6s %-5s %-10s %s\n",$1,$2,$3,$4,$5,$6,$7}'; exit 0; }
+
 # ---------- choose what to install ----------
 ask() { # ask "question" default(y/n)
   local a; read -r -p "$1 " a </dev/tty || a=""; echo "${a:-$2}"
@@ -141,7 +213,101 @@ check_nic() {
   fi
   case "$drv" in vfio-pci|uio_pci_generic|igb_uio) ;; *) [ "$FORCE" = 1 ] || die "$pci uses driver '$drv'; bind it to vfio-pci/uio_pci_generic first" ;; esac
 }
-[ "$ESTIMATE" = 1 ] || for n in "${VPP_NICS[@]}"; do check_nic "$n"; done
+# ---------- NIC picker (interactive, VPP only) ----------
+# Ethernet controllers (PCI class 0x02xx) with their kernel name, driver, link speed and NUMA node.
+# A NIC that carries the default route is the management NIC and can never be offered to VPP.
+
+iommu_ok() { [ -n "$(ls /sys/kernel/iommu_groups 2>/dev/null)" ] || [ "$(cat /sys/module/vfio/parameters/enable_unsafe_noiommu_mode 2>/dev/null || echo N)" = Y ]; }
+bind_vfio() { # bind one NIC to vfio-pci persistently (driverctl); dies rather than half-doing it
+  local pci=$1 net=$2
+  need driverctl
+  run modprobe vfio-pci
+  run install -d /etc/modules-load.d
+  [ "$DRY" = 1 ] || echo vfio-pci > /etc/modules-load.d/boxvector-vfio.conf
+  [ -z "$net" ] || [ "$net" = - ] || run ip link set dev "$net" down
+  run driverctl set-override "$pci" vfio-pci
+}
+
+if [ "$VPP" = 1 ] && [ "$ESTIMATE" != 1 ] && [ ${#VPP_NICS[@]} -eq 0 ] && [ "$ASSUME_YES" != 1 ] && [ -r /dev/tty ]; then
+  mapfile -t _nics < <(nic_list)
+  if [ ${#_nics[@]} -eq 0 ]; then
+    warn "no PCI Ethernet controller found: VPP will start without a data NIC (add one later with --vpp-nic)"
+  else
+    {
+      echo; echo "  Network cards (a card given to VPP leaves the Linux kernel: no ip/ifupdown on it any more)"
+      printf '  %-3s %-13s %-9s %-12s %-6s %-5s %-10s %s\n' '#' PCI IFACE DRIVER SPEED NUMA STATE DEVICE
+      _i=0; for _l in "${_nics[@]}"; do _i=$((_i+1)); IFS='|' read -r _p _n _d _s _u _t _x <<<"$_l"
+        printf '  %-3s %-13s %-9s %-12s %-6s %-5s %-10s %s\n' "$_i" "$_p" "$_n" "$_d" "$_s" "$_u" "$_t" "$_x"; done
+      echo "  mgmt = carries the default route (never offered). has-ip = has an address now. dpdk-ready = already on vfio-pci."
+    } >/dev/tty
+    _sel=$(ask 'Numbers of the NICs for VPP, e.g. "2 3" (empty = none, add later):' "")
+    for _k in $_sel; do
+      [[ "$_k" =~ ^[0-9]+$ ]] && [ "$_k" -ge 1 ] && [ "$_k" -le ${#_nics[@]} ] || die "invalid choice '$_k'"
+      IFS='|' read -r _p _n _d _s _u _t _x <<<"${_nics[$((_k-1))]}"
+      [ "$_t" != mgmt ] || die "$_p ($_n) carries the default route (management): refusing to hand it to VPP"
+      case " ${VPP_NICS[*]} " in *" $_p "*) continue ;; esac
+      VPP_NICS+=("$_p"); [ "$_s" = - ] || NIC_SPEED["$_p"]=$(( ${_s%G} * 1000 ))
+      if [ "$_t" != dpdk-ready ]; then
+        if ! iommu_ok; then
+          if [ "$FORCE" = 1 ] || [ "$DRY" = 1 ]; then warn "no IOMMU on this host: vfio-pci will not work for $_p (VT-d/AMD-Vi + intel_iommu=on/amd_iommu=on)"
+          else die "no IOMMU on this host (VT-d/AMD-Vi off, or missing intel_iommu=on / amd_iommu=on): $_p cannot be bound to vfio-pci. Enable it in BIOS + kernel cmdline first. Nothing was changed."; fi
+        fi
+        _BIND+=("$_p|$_n")
+      fi
+    done
+    [ ${#VPP_NICS[@]} -gt 0 ] || log "no NIC chosen: VPP starts with local0 only"
+  fi
+fi
+
+# ---------- plan summary + confirmation ----------
+show_plan() {
+  local MAIN="" WORKERS="" NW=0 RESERVED="" NPHYS=0 NSMT=0 b p n i=0 pk bn bv
+  [ "$ESTIMATE" = 1 ] && return 0
+  [ "$MODE" = core ] && [ "$VPP" != 1 ] && [ "$WEB" != 1 ] && [ ${#_BIND[@]} -eq 0 ] && [ "${PLAN_ALWAYS:-0}" != 1 ] && return 0
+  [ "$BIRD" = keep ] && bn="keep installed" || bn="BIRD $BIRD"
+  bv=${BV_VERSION}; [ -z "$DEB" ] || bv="from $DEB"
+  pk="boxvector ($bv), $bn, bgpq4, ifupdown2"
+  [ "$VPP" = 1 ] && pk="$pk, vpp, vpp-plugin-core, vpp-plugin-dpdk, python3-vpp-api, vppcfg (venv)"
+  [ ${#_BIND[@]} -eq 0 ] || pk="$pk, driverctl"
+  {
+    echo; echo " boxvector installer"; echo
+    echo " 1. Mode       $MODE"
+    echo " 2. BIRD       $BIRD"
+    if [ "$VPP" = 1 ]; then
+      if [ ${#VPP_NICS[@]} -eq 0 ]; then echo " 3. VPP NICs   none (VPP starts with local0 only)"
+      else
+        for p in "${VPP_NICS[@]}"; do
+          n=$(ls "/sys/bus/pci/devices/$p/net" 2>/dev/null | head -1 || true)
+          printf ' %-13s %s  %s  NUMA %s\n' "$( [ $i = 0 ] && echo '3. VPP NICs  ' || echo '             ')" "$p" "${n:--}" "$(v=$(cat /sys/bus/pci/devices/$p/numa_node 2>/dev/null || echo -1); [ "$v" -ge 0 ] 2>/dev/null && echo $v || echo n/a)"; i=$((i+1))
+        done
+      fi
+    else echo " 3. VPP NICs   - (VPP not installed)"; fi
+    [ "$WEB" = 1 ] && echo " 4. Web UI     $WEB_USER, https :6969" || echo " 4. Web UI     not enabled"
+    echo; echo " -- Plan --------------------------------------------"
+    echo " Packages   : $pk"
+    if [ "$VPP" = 1 ]; then
+      eval "$(vpp_cpu_plan)"
+      echo " VPP cores  : main core $MAIN, reserved for OS/BIRD: ${RESERVED:-none}, workers: ${WORKERS:-none} ($NW)"
+      echo " VPP memory : heap, buffers and hugepages are sized from RAM and route count when written"
+      echo " Will change: /etc/vpp/startup.conf, /etc/vpp/boxvector-lcp.cli, /etc/sysctl.d/81-boxvector-vpp.conf"
+    fi
+    for b in "${_BIND[@]:-}"; do [ -n "$b" ] || continue; p=${b%%|*}; n=${b##*|}
+      echo " Will bind  : $p ($n) -> vfio-pci (persistent, driverctl). $n leaves the kernel: its IPs and routes are removed."
+    done
+    local m; m=$(ip route show default 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | sort -u | tr '\n' ' ')
+    [ -z "$m" ] || echo " Will NOT   : touch ${m% } (management, carries the default route)"
+    if [ ${#_BIND[@]} -gt 0 ]; then
+      echo -n " Rollback   :"; for b in "${_BIND[@]}"; do echo -n " driverctl unset-override ${b%%|*};"; done; echo " then re-add the interface to /etc/network/interfaces"
+    fi
+    echo " ----------------------------------------------------"
+  } | { [ -w /dev/tty ] && [ "$ASSUME_YES" != 1 ] && [ "$DRY" != 1 ] && cat >/dev/tty || cat; }
+}
+show_plan
+if [ "$ESTIMATE" != 1 ] && [ "$DRY" != 1 ] && [ "$ASSUME_YES" != 1 ] && [ -r /dev/tty ] && { [ "$VPP" = 1 ] || [ ${#_BIND[@]} -gt 0 ]; }; then
+  [ "$(ask 'Proceed? [y/N]' n)" = y ] || die "cancelled: nothing was changed"
+fi
+for _b in "${_BIND[@]:-}"; do [ -n "$_b" ] || continue; [ "$DRY" = 1 ] && { echo "+ bind ${_b%%|*} to vfio-pci"; continue; }; bind_vfio "${_b%%|*}" "${_b##*|}"; done
+[ "$ESTIMATE" = 1 ] || for n in "${VPP_NICS[@]}"; do [ "$DRY" = 1 ] && [[ " ${_BIND[*]:-} " == *"$n|"* ]] && continue; check_nic "$n"; done
 
 # ---------- helpers ----------
 export DEBIAN_FRONTEND=noninteractive
@@ -214,53 +380,6 @@ install_vpp() {
   fi
 }
 
-# Split the CPUs for VPP. Reads lscpu topology; nothing is hardcoded.
-#   reserved : first VPP_RESERVE physical cores (all their threads) -> OS, BIRD, boxvector, VPP main thread
-#   workers  : every other physical core on the NUMA node of the NIC (+ SMT siblings with --vpp-smt)
-# Workers on a NUMA node different from the NIC would cross the interconnect for every packet, so they are not used.
-vpp_cpu_plan() {
-  local node=0 pci topo
-  if [ ${#VPP_NICS[@]} -gt 0 ]; then
-    pci=${VPP_NICS[0]}
-    node=$(cat "/sys/bus/pci/devices/$pci/numa_node" 2>/dev/null || echo 0); [ "$node" -ge 0 ] 2>/dev/null || node=0
-  fi
-  topo=$(lscpu -p=CPU,CORE,SOCKET,NODE 2>/dev/null | grep -v '^#' || true)
-  [ -n "$topo" ] || topo=$(seq 0 $(( $(nproc) - 1 )) | awk '{print $1","$1",0,0"}')
-  # NODE column is empty on some VMs: treat as node 0
-  topo=$(echo "$topo" | awk -F, '{n=($4==""?0:$4); print $1","$2","$3","n}')
-  awk -F, -v node="$node" -v reserve="$VPP_RESERVE" -v smt="$VPP_SMT" -v maxw="${VPP_WORKERS:-0}" '
-    function ranges(a, n,   i, out, st, pv) {
-      out=""; st=a[1]; pv=a[1]
-      for (i=2;i<=n+1;i++) {
-        if (i<=n && a[i]==pv+1) { pv=a[i]; continue }
-        out = out (out==""?"":",") (st==pv ? st : st "-" pv)
-        st=a[i]; pv=a[i]
-      }
-      return out
-    }
-    { cpu=$1; key=$3"/"$2; if (!(key in first)) { first[key]=cpu; order[++nk]=key; cnode[key]=$4 }
-      if (cpu<first[key]) first[key]=cpu
-      thr[key]=thr[key] " " cpu; nodeof[cpu]=$4 }
-    END {
-      # sort physical cores by their first cpu id
-      for (i=1;i<=nk;i++) for (j=i+1;j<=nk;j++) if (first[order[j]]+0 < first[order[i]]+0) { tmp=order[i]; order[i]=order[j]; order[j]=tmp }
-      nres=0; nw=0; ncpu=0
-      for (i=1;i<=nk;i++) { k=order[i]; split(thr[k], t, " ")
-        if (nres < reserve) { nres++; for (x in t) res[++nr]=t[x]; continue }
-        if (cnode[k] != node) continue
-        # t[] order is not guaranteed; pick lowest as the physical thread, the rest are SMT siblings
-        n=0; for (x in t) arr[++n]=t[x]+0
-        for (a=1;a<=n;a++) for (b=a+1;b<=n;b++) if (arr[b]<arr[a]) { v=arr[a]; arr[a]=arr[b]; arr[b]=v }
-        w[++nw]=arr[1]; if (smt==1) for (a=2;a<=n;a++) sib[++ns]=arr[a]
-        delete arr
-      }
-      np=nw; for (a=1;a<=ns;a++) w[++nw]=sib[a]
-      for (a=1;a<=nw;a++) for (b=a+1;b<=nw;b++) if (w[b]<w[a]) { v=w[a]; w[a]=w[b]; w[b]=v }
-      if (maxw>0 && nw>maxw) nw=maxw
-      for (a=1;a<=nr;a++) for (b=a+1;b<=nr;b++) if (res[b]+0<res[a]+0) { v=res[a]; res[a]=res[b]; res[b]=v }
-      printf "MAIN=%s\nWORKERS=%s\nNW=%d\nRESERVED=%s\nNPHYS=%d\nNSMT=%d\n", res[1]+0, (nw>0?ranges(w,nw):""), nw, ranges(res,nr), (np<nw?np:nw), nw-(np<nw?np:nw)
-    }' <<<"$topo"
-}
 
 
 hw_probe() {

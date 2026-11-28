@@ -56,6 +56,7 @@ sudo bash install.sh --mode core     # boxvector + BIRD only
 | `--mode all\|core\|custom` | `all` = boxvector, BIRD, bgpq4, VPP + linux-cp, web UI enabled with an admin user. `core` = boxvector, BIRD, bgpq4 only. `custom` = choose with `--vpp/--no-vpp`, `--web/--no-web` |
 | `--bird 2\|3\|keep` | BIRD major version (default 2; 3 adds the CZ.NIC repository) |
 | `--vpp-nic 0000:03:00.0` | add a DPDK NIC to VPP. Refused while the NIC is still a kernel interface, so a remote session is not cut |
+| `--list-nics` | list the Ethernet cards (driver, speed, NUMA, state) and exit. The interactive `all` install also offers a NIC menu, a plan summary and a confirmation: see [docs/vpp.md](docs/vpp.md) |
 | `--web-user NAME` | web UI admin name (default `admin`). Password is random and shown once, or set `BOXVECTOR_WEB_PASSWORD` |
 | `--vpp-nic PCI` (repeatable) | each NIC gets one RX/TX queue per worker, so RSS spreads flows over all cores |
 | `--vpp-reserve N`, `--vpp-smt`, `--vpp-workers N` | physical cores kept for OS/BIRD (default 1) / also use hyper-threads / cap the worker count |
